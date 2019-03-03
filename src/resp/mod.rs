@@ -1,8 +1,5 @@
-use std::num::ParseIntError;
-// use std::str::FromStr;
+use std::str::FromStr;
 use std::string::ToString;
-
-use nom::be_u64;
 
 #[allow(dead_code)]
 #[derive(Debug, PartialEq)]
@@ -14,10 +11,6 @@ pub enum RedisValue {
     Array(Vec<RedisValue>),
     NullArray,
     NullBulkString,
-}
-
-enum RedisValueParsingError {
-    BadInt(ParseIntError),
 }
 
 const NULL_BULK_STRING: &'static str = "$-1\r\n";
@@ -52,6 +45,8 @@ impl ToString for RedisValue {
     }
 }
 
+// Here begins the "FromStr" bits
+
 named!(
     get_string<&str, String>,
     map!(take_until_and_consume!("\r\n"), |s| s.to_string())
@@ -74,18 +69,18 @@ named!(
 
 // this was a fucking nightmare to write.
 named!(get_bulk_string<&str, RedisValue>,
-       alt!(
-           do_parse!(
-               length: map_res!(take_until_and_consume!("\r\n"), |s: &str| s.parse::<u64>()) >>
-                   strs: take!(length) >>
-                   tag!("\r\n") >>
-                   (RedisValue::BulkString(strs.to_string()))
-           ) |
-           do_parse!(
-                   tag!("-1\r\n") >>
-                   (RedisValue::NullBulkString)
-           )
-       )
+    alt!(
+        do_parse!(
+            length: map_res!(take_until_and_consume!("\r\n"), |s: &str| s.parse::<u64>()) >>
+            strs: take!(length) >>
+            tag!("\r\n") >>
+            (RedisValue::BulkString(strs.to_string()))
+        ) |
+        do_parse!(
+            tag!("-1\r\n") >>
+            (RedisValue::NullBulkString)
+        )
+    )
 );
 
 named!(
@@ -118,35 +113,22 @@ named!(
             "*" => call!(get_array)
     )
 );
-// alt!(
-//     do_parse!(
-//         tag("+") >>
-//             get_simple_string
-//     )
-//         | value!(("", RedisValue::NullBulkString)))
 
-#[test]
-fn nom_pls() {
-    let test_str = "+OK\r\n";
-    let res = redis_value_from(test_str);
-    println!("{:?}", res);
-    let test_bulk = "$5\r\nhello\r\n";
-    let res = redis_value_from(test_bulk);
-    println!("{:?}", res);
-    let test_bulk = ":1\r\n";
-    let res = redis_value_from(test_bulk);
-    println!("{:?}", res);
-    let test_bulk = "$-1\r\n";
-    let res = redis_value_from(test_bulk);
-    println!("{:?}", res);
-    let test_bulk = "*2\r\n*3\r\n:1\r\n:2\r\n:3\r\n*2\r\n+Foo\r\n-Bar\r\n";
-    let res = redis_value_from(test_bulk);
-    println!("{:?}", res);
+impl FromStr for RedisValue {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let foo = redis_value_from(s);
+        match foo {
+            Ok(r) => Ok(r.1),
+            Err(e) => Err(e.to_string()), // TODO: Make this better
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::resp::RedisValue;
+    use crate::resp::{FromStr, RedisValue};
     #[cfg(test)]
     use pretty_assertions::assert_eq;
     fn ezs() -> String {
@@ -154,36 +136,51 @@ mod tests {
     }
     #[test]
     fn simple_strings() {
-        let t = RedisValue::SimpleString(ezs()).to_string();
-        assert_eq!(t, "+hello\r\n".to_string());
+        let t = RedisValue::SimpleString(ezs());
+        let s = "+hello\r\n";
+        assert_eq!(t.to_string(), s.to_string());
+        assert_eq!(Ok(t), RedisValue::from_str(s));
     }
     #[test]
     fn error() {
-        let t = RedisValue::Error(ezs()).to_string();
-        assert_eq!(t, "-hello\r\n".to_string());
+        let t = RedisValue::Error(ezs());
+        let s = "-hello\r\n";
+        assert_eq!(t.to_string(), s.to_string());
+        assert_eq!(Ok(t), RedisValue::from_str(s));
     }
     #[test]
     fn bulk_string() {
-        let t = RedisValue::BulkString(ezs()).to_string();
-        assert_eq!(t, "$5\r\nhello\r\n".to_string());
-        let t = RedisValue::BulkString("".to_string()).to_string();
-        assert_eq!(t, "$0\r\n\r\n".to_string());
+        let t = RedisValue::BulkString(ezs());
+        let s = "$5\r\nhello\r\n";
+        assert_eq!(t.to_string(), s.to_string());
+        assert_eq!(Ok(t), RedisValue::from_str(s));
+
+        let t = RedisValue::BulkString("".to_string());
+        let s = "$0\r\n\r\n";
+        assert_eq!(t.to_string(), s.to_string());
+        assert_eq!(Ok(t), RedisValue::from_str(s));
     }
     #[test]
     fn array() {
-        let t = RedisValue::Array(vec![]).to_string();
-        assert_eq!(t, "*0\r\n".to_string());
+        let t = RedisValue::Array(vec![]);
+        let s = "*0\r\n";
+        assert_eq!(t.to_string(), s.to_string());
+        assert_eq!(Ok(t), RedisValue::from_str(s));
 
         let inner = vec![
             RedisValue::BulkString("foo".to_string()),
             RedisValue::BulkString("bar".to_string()),
         ];
-        let t = RedisValue::Array(inner).to_string();
-        assert_eq!(t, "*2\r\n$3\r\nfoo\r\n$3\r\nbar\r\n".to_string());
+        let t = RedisValue::Array(inner);
+        let s = "*2\r\n$3\r\nfoo\r\n$3\r\nbar\r\n";
+        assert_eq!(t.to_string(), s.to_string());
+        assert_eq!(Ok(t), RedisValue::from_str(s));
 
         let inner = vec![RedisValue::Int(1), RedisValue::Int(2), RedisValue::Int(3)];
-        let t = RedisValue::Array(inner).to_string();
-        assert_eq!(t, "*3\r\n:1\r\n:2\r\n:3\r\n".to_string());
+        let t = RedisValue::Array(inner);
+        let s = "*3\r\n:1\r\n:2\r\n:3\r\n";
+        assert_eq!(t.to_string(), s.to_string());
+        assert_eq!(Ok(t), RedisValue::from_str(s));
 
         let inner = vec![
             RedisValue::Int(1),
@@ -192,11 +189,10 @@ mod tests {
             RedisValue::Int(4),
             RedisValue::BulkString("foobar".to_string()),
         ];
-        let t = RedisValue::Array(inner).to_string();
-        assert_eq!(
-            t,
-            "*5\r\n:1\r\n:2\r\n:3\r\n:4\r\n$6\r\nfoobar\r\n".to_string()
-        );
+        let t = RedisValue::Array(inner);
+        let s = "*5\r\n:1\r\n:2\r\n:3\r\n:4\r\n$6\r\nfoobar\r\n";
+        assert_eq!(t.to_string(), s.to_string());
+        assert_eq!(Ok(t), RedisValue::from_str(s));
 
         let inner = vec![
             RedisValue::Array(vec![
@@ -209,21 +205,24 @@ mod tests {
                 RedisValue::Error("Bar".to_string()),
             ]),
         ];
-        let t = RedisValue::Array(inner).to_string();
-        assert_eq!(
-            t,
-            "*2\r\n*3\r\n:1\r\n:2\r\n:3\r\n*2\r\n+Foo\r\n-Bar\r\n".to_string()
-        );
+        let t = RedisValue::Array(inner);
+        let s = "*2\r\n*3\r\n:1\r\n:2\r\n:3\r\n*2\r\n+Foo\r\n-Bar\r\n";
+        assert_eq!(t.to_string(), s.to_string());
+        assert_eq!(Ok(t), RedisValue::from_str(s));
 
         let inner = vec![
             RedisValue::BulkString("foo".to_string()),
             RedisValue::NullBulkString,
             RedisValue::BulkString("bar".to_string()),
         ];
-        let t = RedisValue::Array(inner).to_string();
-        assert_eq!(t, "*3\r\n$3\r\nfoo\r\n$-1\r\n$3\r\nbar\r\n".to_string());
-        let t = RedisValue::NullArray.to_string();
-        assert_eq!(t, "*-1\r\n".to_string());
-    }
+        let t = RedisValue::Array(inner);
+        let s = "*3\r\n$3\r\nfoo\r\n$-1\r\n$3\r\nbar\r\n";
+        assert_eq!(t.to_string(), s.to_string());
+        assert_eq!(Ok(t), RedisValue::from_str(s));
 
+        let t = RedisValue::NullArray;
+        let s = "*-1\r\n";
+        assert_eq!(t.to_string(), s.to_string());
+        assert_eq!(Ok(t), RedisValue::from_str(s));
+    }
 }
