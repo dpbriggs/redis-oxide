@@ -1,8 +1,11 @@
 use std::num::ParseIntError;
-use std::str::FromStr;
+// use std::str::FromStr;
 use std::string::ToString;
 
-#[derive(Debug)]
+use nom::be_u64;
+
+#[allow(dead_code)]
+#[derive(Debug, PartialEq)]
 pub enum RedisValue {
     SimpleString(String),
     Error(String),
@@ -49,11 +52,103 @@ impl ToString for RedisValue {
     }
 }
 
+named!(
+    get_string<&str, String>,
+    map!(take_until_and_consume!("\r\n"), |s| s.to_string())
+);
+
+named!(
+    get_int<&str, i64>,
+    map_res!(get_string, |s: String| s.parse::<i64>())
+);
+
+named!(
+    get_error<&str, RedisValue>,
+    map!(get_string, |s| RedisValue::Error(s))
+);
+
+named!(
+    get_simple_string<&str, RedisValue>,
+    map!(get_string, |s| RedisValue::SimpleString(s))
+);
+
+// this was a fucking nightmare to write.
+named!(get_bulk_string<&str, RedisValue>,
+       alt!(
+           do_parse!(
+               length: map_res!(take_until_and_consume!("\r\n"), |s: &str| s.parse::<u64>()) >>
+                   strs: take!(length) >>
+                   tag!("\r\n") >>
+                   (RedisValue::BulkString(strs.to_string()))
+           ) |
+           do_parse!(
+                   tag!("-1\r\n") >>
+                   (RedisValue::NullBulkString)
+           )
+       )
+);
+
+named!(
+    get_redis_int<&str, RedisValue>,
+    map!(get_int, |s| RedisValue::Int(s))
+);
+
+named!(
+    get_array<&str, RedisValue>,
+    alt!(
+        do_parse!(
+            length: map_res!(take_until_and_consume!("\r\n"), |s: &str| s.parse::<u64>()) >>
+                kids: count!(redis_value_from, length as usize) >>
+                (RedisValue::Array(kids))
+        ) |
+        do_parse!(
+            tag!("-1\r\n") >>
+                (RedisValue::NullArray)
+        )
+    )
+);
+
+named!(
+    redis_value_from<&str, RedisValue>,
+    switch!(take!(1),
+            "+" => call!(get_simple_string) |
+            "-" => call!(get_error) |
+            "$" => call!(get_bulk_string) |
+            ":" => call!(get_redis_int) |
+            "*" => call!(get_array)
+    )
+);
+// alt!(
+//     do_parse!(
+//         tag("+") >>
+//             get_simple_string
+//     )
+//         | value!(("", RedisValue::NullBulkString)))
+
+#[test]
+fn nom_pls() {
+    let test_str = "+OK\r\n";
+    let res = redis_value_from(test_str);
+    println!("{:?}", res);
+    let test_bulk = "$5\r\nhello\r\n";
+    let res = redis_value_from(test_bulk);
+    println!("{:?}", res);
+    let test_bulk = ":1\r\n";
+    let res = redis_value_from(test_bulk);
+    println!("{:?}", res);
+    let test_bulk = "$-1\r\n";
+    let res = redis_value_from(test_bulk);
+    println!("{:?}", res);
+    let test_bulk = "*2\r\n*3\r\n:1\r\n:2\r\n:3\r\n*2\r\n+Foo\r\n-Bar\r\n";
+    let res = redis_value_from(test_bulk);
+    println!("{:?}", res);
+}
+
 #[cfg(test)]
 mod tests {
     use crate::resp::RedisValue;
     #[cfg(test)]
-    use pretty_assertions::{assert_eq, assert_ne};
+    use pretty_assertions::assert_eq;
     fn ezs() -> String {
         "hello".to_string()
     }
@@ -127,6 +222,8 @@ mod tests {
         ];
         let t = RedisValue::Array(inner).to_string();
         assert_eq!(t, "*3\r\n$3\r\nfoo\r\n$-1\r\n$3\r\nbar\r\n".to_string());
+        let t = RedisValue::NullArray.to_string();
+        assert_eq!(t, "*-1\r\n".to_string());
     }
 
 }

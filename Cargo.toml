@@ -8,6 +8,7 @@ edition = "2018"
 tokio = "0.1.15"
 shlex = "0.1.1"
 promptly = "0.1.5"
+nom = "4.2.1"
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"

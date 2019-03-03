@@ -1,8 +1,12 @@
 #![feature(const_fn)]
 #![feature(const_str_len)]
+#[macro_use]
+extern crate nom;
+#[cfg(test)]
 extern crate pretty_assertions;
 extern crate promptly;
 extern crate shlex;
+
 use promptly::prompt;
 use shlex::split;
 use std::collections::HashMap;
