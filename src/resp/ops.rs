@@ -13,6 +13,8 @@ pub enum Ops {
     SMembers(Key),
     SCard(Key),
     SDiff(Vec<String>),
+    SUnion(Vec<String>),
+    SInter(Vec<String>),
     // Misc
     Keys, // TODO: Add optional glob
     Exists(Vec<Key>),
@@ -29,7 +31,7 @@ pub enum OpsError {
     InvalidType,
 }
 
-fn translate_string(start: &String) -> Result<Ops, OpsError> {
+fn translate_string(start: &str) -> Result<Ops, OpsError> {
     match start.to_lowercase().as_ref() {
         "ping" => Ok(Ops::Pong),
         "keys" => Ok(Ops::Keys),
@@ -37,23 +39,23 @@ fn translate_string(start: &String) -> Result<Ops, OpsError> {
     }
 }
 
-fn is_string_type(r: &RedisValue) -> bool {
-    match r {
-        RedisValue::SimpleString(_) => true,
-        RedisValue::BulkString(_) => true,
-        _ => false,
-    }
-}
+// fn is_string_type(r: &RedisValue) -> bool {
+//     match r {
+//         RedisValue::SimpleString(_) => true,
+//         RedisValue::BulkString(_) => true,
+//         _ => false,
+//     }
+// }
 
-fn all_strings(v: &Vec<&RedisValue>) -> bool {
+fn all_strings(v: &[&RedisValue]) -> bool {
     v.iter().fold(true, |acc, x| match x {
-        RedisValue::SimpleString(_) => true && acc,
-        RedisValue::BulkString(_) => true && acc,
-        _ => false && acc,
+        RedisValue::SimpleString(_) => acc,
+        RedisValue::BulkString(_) => acc,
+        _ => false,
     })
 }
 
-fn tails_as_strings(tail: Vec<&RedisValue>) -> Result<Vec<String>, OpsError> {
+fn tails_as_strings(tail: &[&RedisValue]) -> Result<Vec<String>, OpsError> {
     if !all_strings(&tail) {
         return Err(OpsError::InvalidType);
     }
@@ -61,39 +63,40 @@ fn tails_as_strings(tail: Vec<&RedisValue>) -> Result<Vec<String>, OpsError> {
     Ok(keys)
 }
 
-fn verify_size_lower(v: &Vec<&RedisValue>, min_size: usize) -> Result<(), OpsError> {
+fn verify_size_lower(v: &[&RedisValue], min_size: usize) -> Result<(), OpsError> {
     if v.len() < min_size {
         return Err(OpsError::NotEnoughArgs(min_size));
     }
     Ok(())
 }
 
-fn verify_size(v: &Vec<&RedisValue>, size: usize) -> Result<(), OpsError> {
+fn verify_size(v: &[&RedisValue], size: usize) -> Result<(), OpsError> {
     if v.len() != size {
         return Err(OpsError::WrongNumberOfArgs(size));
     }
     Ok(())
 }
 
-fn get_key_and_val(array: &Vec<RedisValue>) -> Result<(Key, String), OpsError> {
+fn get_key_and_val(array: &[RedisValue]) -> Result<(Key, String), OpsError> {
     if array.len() < 3 {
         return Err(OpsError::WrongNumberOfArgs(3));
     }
-    let key = array.get(1).unwrap();
-    let val = array.get(2).unwrap();
+    let key = &array[1];
+    let val = &array[2];
     Ok((key.get_string_inner(), val.get_string_inner())) // TODO: Verify types required
 }
 
-fn get_key_and_tail(array: &Vec<RedisValue>) -> Result<(Key, Vec<String>), OpsError> {
+fn get_key_and_tail(array: &[RedisValue]) -> Result<(Key, Vec<String>), OpsError> {
     if array.len() < 3 {
         return Err(OpsError::WrongNumberOfArgs(3));
     }
-    let set_key = array.get(1).unwrap().get_string_inner();
-    let vals = tails_as_strings(array.iter().skip(2).collect())?;
+    let set_key = array[1].get_string_inner();
+    let tail: Vec<_> = array.iter().skip(2).collect();
+    let vals = tails_as_strings(&tail)?;
     Ok((set_key, vals))
 }
 
-fn translate_array(array: &Vec<RedisValue>) -> Result<Ops, OpsError> {
+fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
     if array.is_empty() {
         return Err(OpsError::Noop);
     }
@@ -116,12 +119,12 @@ fn translate_array(array: &Vec<RedisValue>) -> Result<Ops, OpsError> {
         }
         "get" => {
             verify_size(&tail, 1)?;
-            let key = tail.get(0).unwrap().get_string_inner();
+            let key = tail[0].get_string_inner();
             Ok(Ops::Get(key))
         }
         "exists" => {
             verify_size_lower(&tail, 1)?;
-            let keys = tails_as_strings(tail)?;
+            let keys = tails_as_strings(&tail)?;
             Ok(Ops::Exists(keys))
         }
         // Sets
@@ -135,18 +138,28 @@ fn translate_array(array: &Vec<RedisValue>) -> Result<Ops, OpsError> {
         }
         "smembers" => {
             verify_size(&tail, 1)?;
-            let set_key = tail.get(0).unwrap().get_string_inner();
+            let set_key = tail[0].get_string_inner();
             Ok(Ops::SMembers(set_key))
         }
         "scard" => {
             verify_size(&tail, 1)?;
-            let key = tail.get(0).unwrap().get_string_inner();
+            let key = tail[0].get_string_inner();
             Ok(Ops::SCard(key))
         }
         "sdiff" => {
             verify_size_lower(&tail, 2)?;
-            let keys = tails_as_strings(tail)?;
+            let keys = tails_as_strings(&tail)?;
             Ok(Ops::SDiff(keys))
+        }
+        "sunion" => {
+            verify_size_lower(&tail, 2)?;
+            let keys = tails_as_strings(&tail)?;
+            Ok(Ops::SUnion(keys))
+        }
+        "sinter" => {
+            verify_size_lower(&tail, 2)?;
+            let keys = tails_as_strings(&tail)?;
+            Ok(Ops::SInter(keys))
         }
         _ => Err(OpsError::UnknownOp),
     }

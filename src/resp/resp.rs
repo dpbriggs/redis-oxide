@@ -14,9 +14,9 @@ pub enum RedisValue {
     NullBulkString,
 }
 
-const NULL_BULK_STRING: &'static str = "$-1\r\n";
-const NULL_ARRAY: &'static str = "*-1\r\n";
-const EMPTY_ARRAY: &'static str = "*0\r\n";
+const NULL_BULK_STRING: &str = "$-1\r\n";
+const NULL_ARRAY: &str = "*-1\r\n";
+const EMPTY_ARRAY: &str = "*0\r\n";
 
 impl RedisValue {
     pub fn get_string_inner(&self) -> String {
@@ -32,7 +32,7 @@ impl RedisValue {
 
 impl ToString for RedisValue {
     fn to_string(&self) -> String {
-        let v = match self {
+        match self {
             RedisValue::SimpleString(s) => format!("+{}\r\n", s),
             RedisValue::Error(e) => format!("-{}\r\n", e),
             RedisValue::BulkString(s) => format!("${}\r\n{}\r\n", s.len(), s),
@@ -43,7 +43,7 @@ impl ToString for RedisValue {
                 }
                 let contents: String = a
                     .iter()
-                    .map(|inner| inner.to_string())
+                    .map(ToString::to_string)
                     .collect::<Vec<String>>()
                     .join("");
                 if contents.ends_with("\r\n") {
@@ -53,8 +53,7 @@ impl ToString for RedisValue {
             }
             RedisValue::NullBulkString => NULL_BULK_STRING.to_string(),
             RedisValue::NullArray => NULL_ARRAY.to_string(),
-        };
-        v
+        }
     }
 }
 
@@ -62,7 +61,7 @@ impl ToString for RedisValue {
 
 named!(
     get_string<&str, String>,
-    map!(take_until_and_consume!("\r\n"), |s| s.to_string())
+    map!(take_until_and_consume!("\r\n"), ToString::to_string)
 );
 
 named!(
@@ -72,12 +71,12 @@ named!(
 
 named!(
     get_error<&str, RedisValue>,
-    map!(get_string, |s| RedisValue::Error(s))
+    map!(get_string, RedisValue::Error)
 );
 
 named!(
     get_simple_string<&str, RedisValue>,
-    map!(get_string, |s| RedisValue::SimpleString(s))
+    map!(get_string, RedisValue::SimpleString)
 );
 
 // this was a fucking nightmare to write.
@@ -98,7 +97,7 @@ named!(get_bulk_string<&str, RedisValue>,
 
 named!(
     get_int<&str, RedisValue>,
-    map!(get_i64, |s| RedisValue::Int(s))
+    map!(get_i64, RedisValue::Int)
 );
 
 named!(

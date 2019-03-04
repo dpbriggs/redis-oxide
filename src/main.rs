@@ -8,14 +8,12 @@ extern crate promptly;
 extern crate shlex;
 
 use promptly::prompt;
-use shlex::split;
-use std::fmt;
 
 mod engine;
 mod resp;
 
-use crate::engine::engine::Engine;
-use crate::resp::{ops::translate, resp::RedisValue};
+use self::engine::engine::Engine;
+use self::resp::{ops::translate, resp::RedisValue};
 use std::str::FromStr;
 
 fn main() {
@@ -25,8 +23,8 @@ fn main() {
     loop {
         let line: String = prompt("> ");
         println!("{:?}", line);
-        let set = "*3\r\n$3\r\nset\r\n$3\r\nfoo\r\n$3\r\nbar\r\n";
-        let ping = "*1\r\n$4\r\nPING\r\n";
+        // let set = "*3\r\n$3\r\nset\r\n$3\r\nfoo\r\n$3\r\nbar\r\n";
+        // let ping = "*1\r\n$4\r\nPING\r\n";
         let res = RedisValue::from_str(&line);
         match res {
             Ok(r) => match translate(&r) {
