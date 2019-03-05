@@ -1,4 +1,5 @@
 use crate::resp::ops::Key;
+// use rand::Rng;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 
@@ -7,12 +8,6 @@ type KeySet = HashMap<Key, HashSet<String>>;
 // type RedisObj = HashMap<Key, Value>;
 
 use crate::resp::ops::Ops;
-
-// #[derive(Debug)]
-// enum Value {
-//     String(KeyString),
-//     Set(KeySet),
-// }
 
 #[derive(Default, Debug)]
 pub struct Engine {
@@ -41,7 +36,42 @@ impl fmt::Display for EngineRes {
     }
 }
 
+enum SetOp {
+    Diff,
+    Union,
+    Inter,
+}
+
 impl Engine {
+    fn many_set_op(&self, keys: Vec<String>, op: SetOp) -> Option<HashSet<String>> {
+        let sets: Vec<HashSet<String>> = keys
+            .iter()
+            .filter_map(|key| self.sets.get(key))
+            .cloned()
+            .collect();
+        if sets.is_empty() {
+            return None;
+        }
+        // TODO: Figure this mess of cloning
+        let mut head: HashSet<String> = (*sets.first().unwrap()).to_owned();
+        for set in sets.iter().skip(1).cloned() {
+            head = match op {
+                SetOp::Diff => head.difference(&set).cloned().collect(),
+                SetOp::Union => head.union(&set).cloned().collect(),
+                SetOp::Inter => head.intersection(&set).cloned().collect(),
+            }
+        }
+        Some(head)
+    }
+
+    fn get_or_create_hash_set(&mut self, set_key: &str) -> &mut HashSet<String> {
+        if !self.sets.contains_key(set_key) {
+            self.sets
+                .insert(set_key.to_string().clone(), HashSet::new());
+        }
+        self.sets.get_mut(set_key).unwrap()
+    }
+
     pub fn exec(&mut self, action: Ops) -> EngineRes {
         match action {
             Ops::Get(key) => self
@@ -63,10 +93,7 @@ impl Engine {
                 EngineRes::MultiStringRes(self.kv.iter().map(|(key, _)| key.clone()).collect())
             }
             Ops::SAdd(set_key, vals) => {
-                if !self.sets.contains_key(&set_key) {
-                    self.sets.insert(set_key.clone(), HashSet::new());
-                }
-                let set: &mut HashSet<String> = self.sets.get_mut(&set_key).unwrap();
+                let set = self.get_or_create_hash_set(&set_key);
                 let mut vals_inserted = 0;
                 for val in vals {
                     if set.insert(val) {
@@ -95,45 +122,93 @@ impl Engine {
                 }
                 None => EngineRes::UIntRes(0),
             },
-            Ops::SDiff(keys) => {
-                let sets: Vec<&HashSet<String>> =
-                    keys.iter().filter_map(|key| self.sets.get(key)).collect();
-                if sets.is_empty() {
+            Ops::SDiff(keys) => match self.many_set_op(keys, SetOp::Diff) {
+                Some(hash_set) => EngineRes::MultiStringRes(hash_set.iter().cloned().collect()),
+                None => EngineRes::MultiStringRes(vec![]),
+            },
+            Ops::SUnion(keys) => match self.many_set_op(keys, SetOp::Union) {
+                Some(hash_set) => EngineRes::MultiStringRes(hash_set.iter().cloned().collect()),
+                None => EngineRes::MultiStringRes(vec![]),
+            },
+            Ops::SInter(keys) => match self.many_set_op(keys, SetOp::Inter) {
+                Some(hash_set) => EngineRes::MultiStringRes(hash_set.iter().cloned().collect()),
+                None => EngineRes::MultiStringRes(vec![]),
+            },
+            Ops::SDiffStore(to_store, keys) => match self.many_set_op(keys, SetOp::Diff) {
+                Some(hash_set) => {
+                    let hash_set_size = hash_set.len();
+                    self.sets.insert(to_store, hash_set);
+                    EngineRes::UIntRes(hash_set_size)
+                }
+                None => EngineRes::UIntRes(0),
+            },
+            Ops::SUnionStore(to_store, keys) => match self.many_set_op(keys, SetOp::Inter) {
+                Some(hash_set) => {
+                    let hash_set_size = hash_set.len();
+                    self.sets.insert(to_store, hash_set);
+                    EngineRes::UIntRes(hash_set_size)
+                }
+                None => EngineRes::UIntRes(0),
+            },
+            Ops::SInterStore(to_store, keys) => match self.many_set_op(keys, SetOp::Inter) {
+                Some(hash_set) => {
+                    let hash_set_size = hash_set.len();
+                    self.sets.insert(to_store, hash_set);
+                    EngineRes::UIntRes(hash_set_size)
+                }
+                None => EngineRes::UIntRes(0),
+            },
+            // There's some surprising complexity behind this command
+            Ops::SPop(key, count) => {
+                let set = match self.sets.get_mut(&key) {
+                    Some(s) => s,
+                    None => return EngineRes::Nil,
+                };
+                if set.is_empty() && count.is_some() {
                     return EngineRes::MultiStringRes(vec![]);
+                } else if set.is_empty() {
+                    return EngineRes::Nil;
                 }
-                // TODO: Figure this mess of cloning
-                let mut head: HashSet<String> = (*sets.first().unwrap()).clone().clone();;
-                for set in sets.iter().skip(1).cloned().cloned() {
-                    head = head.difference(&set).cloned().collect();
+                let count = count.unwrap_or(1);
+                let eles: Vec<String> = set.iter().take(count).cloned().collect();
+                for ele in eles.iter() {
+                    set.remove(ele);
                 }
-                EngineRes::MultiStringRes(head.iter().cloned().collect())
+                EngineRes::MultiStringRes(eles)
             }
-            Ops::SUnion(keys) => {
-                let sets: Vec<&HashSet<String>> =
-                    keys.iter().filter_map(|key| self.sets.get(key)).collect();
-                if sets.is_empty() {
-                    return EngineRes::MultiStringRes(vec![]);
+            Ops::SIsMember(key, member) => match self.sets.get(&key) {
+                Some(set) => match set.get(&member) {
+                    Some(_) => EngineRes::UIntRes(1),
+                    None => EngineRes::UIntRes(0),
+                },
+                None => EngineRes::UIntRes(0),
+            },
+            Ops::SMove(src, dest, member) => {
+                if !self.sets.contains_key(&src) || !self.sets.contains_key(&dest) {
+                    return EngineRes::UIntRes(0);
                 }
-                // TODO: Figure this mess of cloning
-                let mut head: HashSet<String> = (*sets.first().unwrap()).clone().clone();;
-                for set in sets.iter().skip(1).cloned().cloned() {
-                    head = head.union(&set).cloned().collect();
+                let src_set = self.sets.get_mut(&src).unwrap();
+                match src_set.take(&member) {
+                    Some(res) => {
+                        self.sets.get_mut(&dest).unwrap().insert(res);
+                        EngineRes::UIntRes(1)
+                    }
+                    None => EngineRes::UIntRes(0),
                 }
-                EngineRes::MultiStringRes(head.iter().cloned().collect())
             }
-            Ops::SInter(keys) => {
-                let sets: Vec<&HashSet<String>> =
-                    keys.iter().filter_map(|key| self.sets.get(key)).collect();
-                if sets.is_empty() {
-                    return EngineRes::MultiStringRes(vec![]);
+            // TODO: Actually make this random
+            Ops::SRandMembers(key, count) => match self.sets.get(&key) {
+                Some(set) => {
+                    let count = count.unwrap_or(1);
+                    if count < 0 {
+                        return EngineRes::MultiStringRes(
+                            set.iter().cycle().take(-count as usize).cloned().collect(),
+                        );
+                    };
+                    EngineRes::MultiStringRes(set.iter().take(count as usize).cloned().collect())
                 }
-                // TODO: Figure this mess of cloning
-                let mut head: HashSet<String> = (*sets.first().unwrap()).clone().clone();;
-                for set in sets.iter().skip(1).cloned().cloned() {
-                    head = head.intersection(&set).cloned().collect();
-                }
-                EngineRes::MultiStringRes(head.iter().cloned().collect())
-            }
+                None => EngineRes::Nil,
+            },
         }
     }
 }

@@ -3,7 +3,7 @@ use std::str::FromStr;
 use std::string::ToString;
 
 #[allow(dead_code)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum RedisValue {
     SimpleString(String),
     Error(String),
