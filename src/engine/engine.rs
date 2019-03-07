@@ -1,11 +1,11 @@
 use crate::resp::ops::Key;
 // use rand::Rng;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
 
 type KeyString = HashMap<Key, String>;
 type KeySet = HashMap<Key, HashSet<String>>;
-// type RedisObj = HashMap<Key, Value>;
+type KeyList = HashMap<Key, VecDeque<String>>;
 
 use crate::resp::ops::Ops;
 
@@ -13,12 +13,14 @@ use crate::resp::ops::Ops;
 pub struct Engine {
     kv: KeyString,
     sets: KeySet,
+    lists: KeyList,
 }
 
 #[derive(Debug)]
 pub enum EngineRes {
     Ok,
     StringRes(String),
+    Error(&'static str),
     MultiStringRes(Vec<String>),
     UIntRes(usize),
     Nil,
@@ -32,6 +34,7 @@ impl fmt::Display for EngineRes {
             EngineRes::UIntRes(i) => write!(f, "{}", i),
             EngineRes::MultiStringRes(ss) => write!(f, "{:?}", ss),
             EngineRes::Nil => write!(f, "(nil)"),
+            EngineRes::Error(e) => write!(f, "ERR {}", e),
         }
     }
 }
@@ -72,6 +75,13 @@ impl Engine {
         self.sets.get_mut(set_key).unwrap()
     }
 
+    fn get_or_create_list(&mut self, key: &str) -> &mut VecDeque<String> {
+        if !self.lists.contains_key(key) {
+            self.lists.insert(key.to_string().clone(), VecDeque::new());
+        }
+        self.lists.get_mut(key).unwrap()
+    }
+
     pub fn exec(&mut self, action: Ops) -> EngineRes {
         match action {
             Ops::Get(key) => self
@@ -82,6 +92,21 @@ impl Engine {
                 self.kv.insert(key, value);
                 EngineRes::Ok
             }
+            Ops::Del(keys) => {
+                let deleted = keys
+                    .iter()
+                    .map(|x| self.kv.remove(x))
+                    .filter(|x| x.is_some())
+                    .count();
+                EngineRes::UIntRes(deleted)
+            }
+            Ops::Rename(key, new_key) => match self.kv.remove(&key) {
+                Some(value) => {
+                    self.kv.insert(new_key, value);
+                    EngineRes::Ok
+                }
+                None => EngineRes::Error("no such key"),
+            },
             Ops::Pong => EngineRes::StringRes("PONG".to_string()),
             Ops::Exists(keys) => EngineRes::UIntRes(
                 keys.iter()
@@ -207,6 +232,29 @@ impl Engine {
                     };
                     EngineRes::MultiStringRes(set.iter().take(count as usize).cloned().collect())
                 }
+                None => EngineRes::Nil,
+            },
+            Ops::LPush(key, vals) => {
+                let list = self.get_or_create_list(&key);
+                for val in vals {
+                    list.push_front(val)
+                }
+                EngineRes::UIntRes(list.len())
+            }
+            Ops::LPushX(key, val) => {
+                if !self.lists.contains_key(&key) {
+                    return EngineRes::UIntRes(0);
+                }
+                let list = self.get_or_create_list(&key);
+                list.push_front(val);
+                EngineRes::UIntRes(list.len())
+            }
+            Ops::LLen(key) => match self.lists.get(&key) {
+                Some(l) => EngineRes::UIntRes(l.len()),
+                None => EngineRes::UIntRes(0),
+            },
+            Ops::LPop(key) => match self.lists.get_mut(&key).and_then(|x| x.pop_front()) {
+                Some(v) => EngineRes::StringRes(v),
                 None => EngineRes::Nil,
             },
         }
