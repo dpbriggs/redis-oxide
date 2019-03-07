@@ -7,6 +7,17 @@
 This project is intended to be a more-or-less drop in replacement for redis.
 It's under construction at the moment.
 
+#+begin_example
+> : sadd myset foo bar baz
+UIntRes(3)
+> : sadd second-set hello world bar
+UIntRes(3)
+> : sunion myset second-set
+MultiStringRes(["baz", "world", "bar", "foo", "hello"])
+> : sinter myset second-set
+MultiStringRes(["bar"])
+#+end_example
+
 ** Building / Running
 
 This project requires the rust nightly. You can use [[https://rustup.rs/][rustup]] to install it.
