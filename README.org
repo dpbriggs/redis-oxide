@@ -1,0 +1,18 @@
+#+TITLE: Redis-Oxide
+#+SUBTITLE: rusty-redis clone
+#+AUTHOR: David Briggs
+
+* Redis Oxide
+
+This project is intended to be a more-or-less drop in replacement for redis.
+It's under construction at the moment.
+
+** Building / Running
+
+This project requires the rust nightly. You can use [[https://rustup.rs/][rustup]] to install it.
+Then, it's just the same as other rust projects:
+
+#+begin_example
+~ cd redis-oxide
+~ cargo run
+#+end_example

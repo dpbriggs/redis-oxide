@@ -1,5 +1,5 @@
 [package]
-name = "redis-clone"
+name = "redis-oxide"
 version = "0.1.0"
 authors = ["David Briggs <dpbriggs@edu.uwaterloo.ca>"]
 edition = "2018"
