@@ -21,6 +21,7 @@ fn main() {
     // let test_str = "set \"fo  o\" \"awdaw   ddw\"";
     // let test_str_two = "get \"fo  o\"";
     let engine = Engine::default();
+    server();
     loop {
         let line: String = prompt("> ");
         println!("{:?}", line);

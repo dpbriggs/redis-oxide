@@ -5,10 +5,10 @@ authors = ["David Briggs <dpbriggs@edu.uwaterloo.ca>"]
 edition = "2018"
 
 [dependencies]
-tokio = "0.1.15"
+tokio = "0.1.17"
 shlex = "0.1.1"
 promptly = "0.1.5"
-nom = "4.2.1"
+nom = "4.2.2"
 rand = "0.6.5"
 
 [dev-dependencies]

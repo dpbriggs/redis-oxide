@@ -1,42 +1,14 @@
-use std::collections::HashMap;
 use std::env;
 use std::io::BufReader;
 use std::net::SocketAddr;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
+use crate::engine::engine::Engine;
+use crate::resp::{ops::translate, resp::RedisValue};
+use std::str::FromStr;
 use tokio::io::{lines, write_all};
 use tokio::net::TcpListener;
 use tokio::prelude::*;
-
-/// The in-memory database shared amongst all clients.
-///
-/// This database will be shared via `Arc`, so to mutate the internal map we're
-/// going to use a `Mutex` for interior mutability.
-struct Database {
-    map: Mutex<HashMap<String, String>>,
-}
-
-/// Possible requests our clients can send us
-enum Request {
-    Get { key: String },
-    Set { key: String, value: String },
-}
-
-/// Responses to the `Request` commands above
-enum Response {
-    Value {
-        key: String,
-        value: String,
-    },
-    Set {
-        key: String,
-        value: String,
-        previous: Option<String>,
-    },
-    Error {
-        msg: String,
-    },
-}
 
 pub fn server() -> Result<(), Box<std::error::Error>> {
     // Parse the address we're going to run this server on
@@ -46,16 +18,7 @@ pub fn server() -> Result<(), Box<std::error::Error>> {
     let listener = TcpListener::bind(&addr).map_err(|_| "failed to bind")?;
     println!("Listening on: {}", addr);
 
-    // Create the shared state of this server that will be shared amongst all
-    // clients. We populate the initial database and then create the `Database`
-    // structure. Note the usage of `Arc` here which will be used to ensure that
-    // each independently spawned client will have a reference to the in-memory
-    // database.
-    let mut initial_db = HashMap::new();
-    initial_db.insert("foo".to_string(), "bar".to_string());
-    let db = Arc::new(Database {
-        map: Mutex::new(initial_db),
-    });
+    let engine = Arc::new(Engine::default());
 
     let done = listener
         .incoming()
@@ -80,33 +43,17 @@ pub fn server() -> Result<(), Box<std::error::Error>> {
             // requests (lines) we receive from the client. The actual handling here
             // is pretty simple, first we parse the request and if it's valid we
             // generate a response based on the values in the database.
-            let db = db.clone();
+            let engine = engine.clone();
             let responses = lines.map(move |line| {
-                let request = match Request::parse(&line) {
-                    Ok(req) => req,
-                    Err(e) => return Response::Error { msg: e },
-                };
-
-                let mut db = db.map.lock().unwrap();
-                match request {
-                    Request::Get { key } => match db.get(&key) {
-                        Some(value) => Response::Value {
-                            key,
-                            value: value.clone(),
-                        },
-                        None => Response::Error {
-                            msg: format!("no key {}", key),
-                        },
+                let res = match RedisValue::from_str(&line) {
+                    Ok(r) => match translate(&r) {
+                        Ok(ops) => ops,
+                        Err(e) => return RedisValue::Error(format!("{:?}", e)).to_string(),
                     },
-                    Request::Set { key, value } => {
-                        let previous = db.insert(key.clone(), value.clone());
-                        Response::Set {
-                            key,
-                            value,
-                            previous,
-                        }
-                    }
-                }
+                    Err(e) => return RedisValue::Error(e).to_string(),
+                };
+                let res = (*engine).clone().exec(res);
+                res.to_string()
             });
 
             // At this point `responses` is a stream of `Response` types which we
@@ -114,8 +61,6 @@ pub fn server() -> Result<(), Box<std::error::Error>> {
             // `Stream::fold` to perform a loop here, serializing each response and
             // then writing it out to the client.
             let writes = responses.fold(writer, |writer, response| {
-                let mut response = response.serialize();
-                response.push('\n');
                 write_all(writer, response.into_bytes()).map(|(w, _)| w)
             });
 
@@ -129,54 +74,4 @@ pub fn server() -> Result<(), Box<std::error::Error>> {
 
     tokio::run(done);
     Ok(())
-}
-
-impl Request {
-    fn parse(input: &str) -> Result<Request, String> {
-        let mut parts = input.splitn(3, " ");
-        match parts.next() {
-            Some("GET") => {
-                let key = match parts.next() {
-                    Some(key) => key,
-                    None => return Err(format!("GET must be followed by a key")),
-                };
-                if parts.next().is_some() {
-                    return Err(format!("GET's key must not be followed by anything"));
-                }
-                Ok(Request::Get {
-                    key: key.to_string(),
-                })
-            }
-            Some("SET") => {
-                let key = match parts.next() {
-                    Some(key) => key,
-                    None => return Err(format!("SET must be followed by a key")),
-                };
-                let value = match parts.next() {
-                    Some(value) => value,
-                    None => return Err(format!("SET needs a value")),
-                };
-                Ok(Request::Set {
-                    key: key.to_string(),
-                    value: value.to_string(),
-                })
-            }
-            Some(cmd) => Err(format!("unknown command: {}", cmd)),
-            None => Err(format!("empty input")),
-        }
-    }
-}
-
-impl Response {
-    fn serialize(&self) -> String {
-        match *self {
-            Response::Value { ref key, ref value } => format!("{} = {}", key, value),
-            Response::Set {
-                ref key,
-                ref value,
-                ref previous,
-            } => format!("set {} = `{}`, previous: {:?}", key, value, previous),
-            Response::Error { ref msg } => format!("error: {}", msg),
-        }
-    }
 }

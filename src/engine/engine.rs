@@ -102,7 +102,7 @@ impl Engine {
                 let deleted = keys
                     .iter()
                     .map(|x| self.kv.write().unwrap().remove(x))
-                    .filter(|x| x.is_some())
+                    .filter(Option::is_some)
                     .count();
                 EngineRes::UIntRes(deleted)
             }
@@ -279,7 +279,7 @@ impl Engine {
                 .write()
                 .unwrap()
                 .get_mut(&key)
-                .and_then(|x| x.pop_front())
+                .and_then(VecDeque::pop_front)
             {
                 Some(v) => EngineRes::StringRes(v),
                 None => EngineRes::Nil,
