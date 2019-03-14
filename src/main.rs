@@ -1,6 +1,5 @@
 #![feature(const_fn)]
 #![feature(const_str_len)]
-#![feature(try_from)]
 #[macro_use]
 extern crate nom;
 #[cfg(test)]
