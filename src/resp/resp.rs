@@ -1,6 +1,25 @@
+use crate::engine::engine::EngineRes;
 use shlex::split;
+use std::convert::From;
 use std::str::FromStr;
 use std::string::ToString;
+
+impl From<EngineRes> for RedisValue {
+    fn from(engine_res: EngineRes) -> Self {
+        match engine_res {
+            EngineRes::Ok => RedisValue::SimpleString("OK".to_owned()),
+            EngineRes::Nil => RedisValue::NullBulkString,
+            EngineRes::StringRes(s) => RedisValue::BulkString(s),
+            EngineRes::MultiStringRes(a) => RedisValue::Array(
+                a.iter()
+                    .map(|s| RedisValue::BulkString(s.to_string()))
+                    .collect(),
+            ),
+            EngineRes::UIntRes(i) => RedisValue::Int(i as i64),
+            EngineRes::Error(e) => RedisValue::Error(e.to_string()),
+        }
+    }
+}
 
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, Clone)]

@@ -2,18 +2,18 @@ use crate::resp::ops::Key;
 // use rand::Rng;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
-
+use std::sync::{Arc, RwLock};
 type KeyString = HashMap<Key, String>;
 type KeySet = HashMap<Key, HashSet<String>>;
 type KeyList = HashMap<Key, VecDeque<String>>;
 
 use crate::resp::ops::Ops;
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct Engine {
-    kv: KeyString,
-    sets: KeySet,
-    lists: KeyList,
+    kv: Arc<RwLock<KeyString>>,
+    sets: Arc<RwLock<KeySet>>,
+    lists: Arc<RwLock<KeyList>>,
 }
 
 #[derive(Debug)]
@@ -47,9 +47,10 @@ enum SetOp {
 
 impl Engine {
     fn many_set_op(&self, keys: Vec<String>, op: SetOp) -> Option<HashSet<String>> {
+        let engine_sets = self.sets.read().unwrap();
         let sets: Vec<HashSet<String>> = keys
             .iter()
-            .filter_map(|key| self.sets.get(key))
+            .filter_map(|key| engine_sets.get(key))
             .cloned()
             .collect();
         if sets.is_empty() {
@@ -67,42 +68,47 @@ impl Engine {
         Some(head)
     }
 
-    fn get_or_create_hash_set(&mut self, set_key: &str) -> &mut HashSet<String> {
-        if !self.sets.contains_key(set_key) {
+    fn create_list_if_necessary(&self, list_key: &str) {
+        if !self.lists.read().unwrap().contains_key(list_key) {
+            self.lists
+                .write()
+                .unwrap()
+                .insert(list_key.to_string().clone(), VecDeque::new());
+        }
+    }
+
+    fn create_set_if_necessary(&self, set_key: &str) {
+        if !self.sets.read().unwrap().contains_key(set_key) {
             self.sets
+                .write()
+                .unwrap()
                 .insert(set_key.to_string().clone(), HashSet::new());
         }
-        self.sets.get_mut(set_key).unwrap()
     }
 
-    fn get_or_create_list(&mut self, key: &str) -> &mut VecDeque<String> {
-        if !self.lists.contains_key(key) {
-            self.lists.insert(key.to_string().clone(), VecDeque::new());
-        }
-        self.lists.get_mut(key).unwrap()
-    }
-
-    pub fn exec(&mut self, action: Ops) -> EngineRes {
+    pub fn exec(self, action: Ops) -> EngineRes {
         match action {
             Ops::Get(key) => self
                 .kv
+                .read()
+                .unwrap()
                 .get(&key)
                 .map_or(EngineRes::Nil, |v| EngineRes::StringRes(v.to_string())),
             Ops::Set(key, value) => {
-                self.kv.insert(key, value);
+                self.kv.write().unwrap().insert(key, value);
                 EngineRes::Ok
             }
             Ops::Del(keys) => {
                 let deleted = keys
                     .iter()
-                    .map(|x| self.kv.remove(x))
+                    .map(|x| self.kv.write().unwrap().remove(x))
                     .filter(|x| x.is_some())
                     .count();
                 EngineRes::UIntRes(deleted)
             }
-            Ops::Rename(key, new_key) => match self.kv.remove(&key) {
+            Ops::Rename(key, new_key) => match self.kv.write().unwrap().remove(&key) {
                 Some(value) => {
-                    self.kv.insert(new_key, value);
+                    self.kv.write().unwrap().insert(new_key, value);
                     EngineRes::Ok
                 }
                 None => EngineRes::Error("no such key"),
@@ -110,15 +116,23 @@ impl Engine {
             Ops::Pong => EngineRes::StringRes("PONG".to_string()),
             Ops::Exists(keys) => EngineRes::UIntRes(
                 keys.iter()
-                    .map(|key| self.kv.contains_key(key))
+                    .map(|key| self.kv.read().unwrap().contains_key(key))
                     .filter(|exists| *exists)
                     .count(),
             ),
-            Ops::Keys => {
-                EngineRes::MultiStringRes(self.kv.iter().map(|(key, _)| key.clone()).collect())
-            }
+            Ops::Keys => EngineRes::MultiStringRes(
+                self.kv
+                    .read()
+                    .unwrap()
+                    .iter()
+                    .map(|(key, _)| key.clone())
+                    .collect(),
+            ),
             Ops::SAdd(set_key, vals) => {
-                let set = self.get_or_create_hash_set(&set_key);
+                self.create_set_if_necessary(&set_key);
+                let mut sets = self.sets.write().unwrap();
+                let set = sets.get_mut(&set_key).unwrap();
+
                 let mut vals_inserted = 0;
                 for val in vals {
                     if set.insert(val) {
@@ -127,15 +141,15 @@ impl Engine {
                 }
                 EngineRes::UIntRes(vals_inserted)
             }
-            Ops::SMembers(set_key) => match self.sets.get(&set_key) {
+            Ops::SMembers(set_key) => match self.sets.read().unwrap().get(&set_key) {
                 Some(hs) => EngineRes::MultiStringRes(hs.iter().map(ToString::to_string).collect()),
                 None => EngineRes::MultiStringRes(vec![]),
             },
-            Ops::SCard(set_key) => match self.sets.get(&set_key) {
+            Ops::SCard(set_key) => match self.sets.read().unwrap().get(&set_key) {
                 Some(hs) => EngineRes::UIntRes(hs.len()),
                 None => EngineRes::UIntRes(0),
             },
-            Ops::SRem(set_key, vals) => match self.sets.get_mut(&set_key) {
+            Ops::SRem(set_key, vals) => match self.sets.write().unwrap().get_mut(&set_key) {
                 Some(hs) => {
                     let mut vals_removed = 0;
                     for val in vals {
@@ -162,7 +176,7 @@ impl Engine {
             Ops::SDiffStore(to_store, keys) => match self.many_set_op(keys, SetOp::Diff) {
                 Some(hash_set) => {
                     let hash_set_size = hash_set.len();
-                    self.sets.insert(to_store, hash_set);
+                    self.sets.write().unwrap().insert(to_store, hash_set);
                     EngineRes::UIntRes(hash_set_size)
                 }
                 None => EngineRes::UIntRes(0),
@@ -170,7 +184,7 @@ impl Engine {
             Ops::SUnionStore(to_store, keys) => match self.many_set_op(keys, SetOp::Inter) {
                 Some(hash_set) => {
                     let hash_set_size = hash_set.len();
-                    self.sets.insert(to_store, hash_set);
+                    self.sets.write().unwrap().insert(to_store, hash_set);
                     EngineRes::UIntRes(hash_set_size)
                 }
                 None => EngineRes::UIntRes(0),
@@ -178,14 +192,15 @@ impl Engine {
             Ops::SInterStore(to_store, keys) => match self.many_set_op(keys, SetOp::Inter) {
                 Some(hash_set) => {
                     let hash_set_size = hash_set.len();
-                    self.sets.insert(to_store, hash_set);
+                    self.sets.write().unwrap().insert(to_store, hash_set);
                     EngineRes::UIntRes(hash_set_size)
                 }
                 None => EngineRes::UIntRes(0),
             },
             // There's some surprising complexity behind this command
             Ops::SPop(key, count) => {
-                let set = match self.sets.get_mut(&key) {
+                let mut sets = self.sets.write().unwrap();
+                let set = match sets.get_mut(&key) {
                     Some(s) => s,
                     None => return EngineRes::Nil,
                 };
@@ -201,7 +216,7 @@ impl Engine {
                 }
                 EngineRes::MultiStringRes(eles)
             }
-            Ops::SIsMember(key, member) => match self.sets.get(&key) {
+            Ops::SIsMember(key, member) => match self.sets.read().unwrap().get(&key) {
                 Some(set) => match set.get(&member) {
                     Some(_) => EngineRes::UIntRes(1),
                     None => EngineRes::UIntRes(0),
@@ -209,20 +224,22 @@ impl Engine {
                 None => EngineRes::UIntRes(0),
             },
             Ops::SMove(src, dest, member) => {
-                if !self.sets.contains_key(&src) || !self.sets.contains_key(&dest) {
+                let sets = self.sets.read().unwrap();
+                if !sets.contains_key(&src) || !sets.contains_key(&dest) {
                     return EngineRes::UIntRes(0);
                 }
-                let src_set = self.sets.get_mut(&src).unwrap();
+                let mut sets = self.sets.write().unwrap();
+                let src_set = sets.get_mut(&src).unwrap();
                 match src_set.take(&member) {
                     Some(res) => {
-                        self.sets.get_mut(&dest).unwrap().insert(res);
+                        sets.get_mut(&dest).unwrap().insert(res);
                         EngineRes::UIntRes(1)
                     }
                     None => EngineRes::UIntRes(0),
                 }
             }
             // TODO: Actually make this random
-            Ops::SRandMembers(key, count) => match self.sets.get(&key) {
+            Ops::SRandMembers(key, count) => match self.sets.read().unwrap().get(&key) {
                 Some(set) => {
                     let count = count.unwrap_or(1);
                     if count < 0 {
@@ -235,25 +252,35 @@ impl Engine {
                 None => EngineRes::Nil,
             },
             Ops::LPush(key, vals) => {
-                let list = self.get_or_create_list(&key);
+                self.create_list_if_necessary(&key);
+                let mut lists = self.lists.write().unwrap();
+                let list = lists.get_mut(&key).unwrap();
                 for val in vals {
                     list.push_front(val)
                 }
                 EngineRes::UIntRes(list.len())
             }
             Ops::LPushX(key, val) => {
-                if !self.lists.contains_key(&key) {
+                if !self.lists.read().unwrap().contains_key(&key) {
                     return EngineRes::UIntRes(0);
                 }
-                let list = self.get_or_create_list(&key);
+                self.create_list_if_necessary(&key);
+                let mut lists = self.lists.write().unwrap();
+                let list = lists.get_mut(&key).unwrap();
                 list.push_front(val);
                 EngineRes::UIntRes(list.len())
             }
-            Ops::LLen(key) => match self.lists.get(&key) {
+            Ops::LLen(key) => match self.lists.read().unwrap().get(&key) {
                 Some(l) => EngineRes::UIntRes(l.len()),
                 None => EngineRes::UIntRes(0),
             },
-            Ops::LPop(key) => match self.lists.get_mut(&key).and_then(|x| x.pop_front()) {
+            Ops::LPop(key) => match self
+                .lists
+                .write()
+                .unwrap()
+                .get_mut(&key)
+                .and_then(|x| x.pop_front())
+            {
                 Some(v) => EngineRes::StringRes(v),
                 None => EngineRes::Nil,
             },
