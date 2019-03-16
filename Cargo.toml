@@ -10,6 +10,7 @@ shlex = "0.1.1"
 promptly = "0.1.5"
 nom = "4.2.2"
 rand = "0.6.5"
+tokio-codec = "0.1.1"
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"

@@ -6,7 +6,7 @@ use std::sync::Arc;
 use crate::engine::engine::Engine;
 use crate::resp::{ops::translate, resp::RedisValue};
 use std::str::FromStr;
-use tokio::io::{lines, write_all};
+use tokio::io::{lines, read_to_end, write_all};
 use tokio::net::TcpListener;
 use tokio::prelude::*;
 
@@ -31,7 +31,10 @@ pub fn server() -> Result<(), Box<std::error::Error>> {
 
             // Since our protocol is line-based we use `tokio_io`'s `lines` utility
             // to convert our stream of bytes, `reader`, into a `Stream` of lines.
-            let lines = lines(BufReader::new(reader));
+            let buf: Vec<u8> = Vec::new();
+            // let lines = lines(BufReader::new(reader));
+            // reader.read_to_end(&mut buf);
+            let lines = read_to_end(reader, buf);
 
             // Here's where the meat of the processing in this server happens. First
             // we see a clone of the database being created, which is creating a
@@ -44,25 +47,30 @@ pub fn server() -> Result<(), Box<std::error::Error>> {
             // is pretty simple, first we parse the request and if it's valid we
             // generate a response based on the values in the database.
             let engine = engine.clone();
-            let responses = lines.map(move |line| {
-                let res = match RedisValue::from_str(&line) {
-                    Ok(r) => match translate(&r) {
-                        Ok(ops) => ops,
-                        Err(e) => return RedisValue::Error(format!("{:?}", e)).to_string(),
-                    },
-                    Err(e) => return RedisValue::Error(e).to_string(),
-                };
-                let res = (*engine).clone().exec(res);
-                res.to_string()
-            });
+            let writes = lines
+                .map(move |(_stream, line)| {
+                    println!("{:?}", line);
+                    println!("---");
+                    let line = String::from_utf8(line).unwrap();
+                    let res = match RedisValue::from_str(&line) {
+                        Ok(r) => match translate(&r) {
+                            Ok(ops) => ops,
+                            Err(e) => return RedisValue::Error(format!("{:?}", e)).to_string(),
+                        },
+                        Err(e) => return RedisValue::Error(e).to_string(),
+                    };
+                    let res = (*engine).clone().exec(res);
+                    res.to_string()
+                })
+                .map(|res| write_all(writer, res.into_bytes()).map(|(w, _)| w));
 
             // At this point `responses` is a stream of `Response` types which we
             // now want to write back out to the client. To do that we use
             // `Stream::fold` to perform a loop here, serializing each response and
             // then writing it out to the client.
-            let writes = responses.fold(writer, |writer, response| {
-                write_all(writer, response.into_bytes()).map(|(w, _)| w)
-            });
+            // let writes = responses.fold(writer, |writer, response| {
+            //     write_all(writer, response.into_bytes()).map(|(w, _)| w)
+            // });
 
             // Like with other small servers, we'll `spawn` this client to ensure it
             // runs concurrently with all other clients, for now ignoring any errors
