@@ -1,7 +1,7 @@
 use crate::types::RedisValue;
 use std::convert::TryFrom;
 
-use crate::types::{Count, ICount, Key, Value};
+use crate::types::{Count, Key, Value};
 
 #[derive(Debug)]
 pub enum Ops {
@@ -24,7 +24,7 @@ pub enum Ops {
     SInterStore(Key, Vec<Value>),
     SPop(Key, Option<Count>),
     SMove(Key, Key, Value),
-    SRandMembers(Key, Option<ICount>),
+    SRandMembers(Key, Option<Count>),
     // Lists
     LPush(Key, Vec<Value>),
     LPushX(Key, Value),
@@ -84,24 +84,6 @@ impl TryFrom<&RedisValue> for String {
 
     fn try_from(r: &RedisValue) -> Result<String, Self::Error> {
         String::try_from(r.clone())
-    }
-}
-
-impl TryFrom<&RedisValue> for ICount {
-    type Error = OpsError;
-
-    fn try_from(r: &RedisValue) -> Result<ICount, Self::Error> {
-        match r {
-            RedisValue::Int(e) => Ok(*e as ICount),
-            RedisValue::SimpleString(s) => {
-                let s = String::from_utf8_lossy(&s);
-                match s.parse::<ICount>() {
-                    Ok(i) => Ok(i),
-                    Err(_) => Err(OpsError::InvalidType),
-                }
-            }
-            _ => Err(OpsError::InvalidType),
-        }
     }
 }
 
@@ -288,7 +270,7 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
             verify_size_lower(&tail, 1)?;
             let key = Key::try_from(tail[0])?;
             let count = match tail.get(1) {
-                Some(c) => Some(ICount::try_from(*c)?),
+                Some(c) => Some(Count::try_from(*c)?),
                 None => None,
             };
             Ok(Ops::SRandMembers(key, count))

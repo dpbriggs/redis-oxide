@@ -26,7 +26,7 @@ fn main() {
     // let test_str = "set \"fo  o\" \"awdaw   ddw\"";
     // let test_str_two = "get \"fo  o\"";
     let engine = Engine::default();
-    let set = "*3\r\n$3\r\nset\r\n$3\r\nfoo\r\n$3\r\nbar";
+    // let set = "*3\r\n$3\r\nset\r\n$3\r\nfoo\r\n$3\r\nbar";
     server().expect("server failed");
     loop {
         let line: String = prompt("> ");

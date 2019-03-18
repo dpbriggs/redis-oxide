@@ -1,8 +1,9 @@
 /// These types are used by engine and ops to actually perform useful work.
 pub type Value = Vec<u8>;
+/// Key is the standard type to index our structures
 pub type Key = Vec<u8>;
-pub type Count = usize;
-pub type ICount = i64;
+/// Count is used for commands that count.
+pub type Count = i64;
 
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, Clone)]

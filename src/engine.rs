@@ -200,7 +200,10 @@ impl Engine {
                     return EngineRes::Nil;
                 }
                 let count = count.unwrap_or(1);
-                let eles: Vec<Value> = set.iter().take(count).cloned().collect();
+                if count < 0 {
+                    return EngineRes::Error(b"Count cannot be less than 0!");
+                }
+                let eles: Vec<Value> = set.iter().take(count as usize).cloned().collect();
                 for ele in eles.iter() {
                     set.remove(ele);
                 }
