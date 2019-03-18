@@ -1,12 +1,11 @@
 use std::env;
-use std::io::BufReader;
+
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use crate::engine::engine::Engine;
-use crate::resp::{ops::translate, resp::RedisValue};
+use crate::{engine::Engine, ops::translate, types::RedisValue};
 use std::str::FromStr;
-use tokio::io::{lines, read_to_end, write_all};
+use tokio::io::{read_to_end, write_all};
 use tokio::net::TcpListener;
 use tokio::prelude::*;
 
@@ -55,9 +54,15 @@ pub fn server() -> Result<(), Box<std::error::Error>> {
                     let res = match RedisValue::from_str(&line) {
                         Ok(r) => match translate(&r) {
                             Ok(ops) => ops,
-                            Err(e) => return RedisValue::Error(format!("{:?}", e)).to_string(),
+                            Err(e) => {
+                                return RedisValue::Error(format!("{:?}", e).as_bytes().to_vec())
+                                    .to_string()
+                            }
                         },
-                        Err(e) => return RedisValue::Error(e).to_string(),
+                        Err(e) => {
+                            return RedisValue::Error(format!("{:?}", e).as_bytes().to_vec())
+                                .to_string()
+                        }
                     };
                     let res = (*engine).clone().exec(res);
                     res.to_string()

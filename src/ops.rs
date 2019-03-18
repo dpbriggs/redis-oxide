@@ -1,35 +1,33 @@
-use crate::resp::resp::RedisValue;
+use crate::types::RedisValue;
 use std::convert::TryFrom;
 
-pub type Key = String;
-pub type Count = usize;
-pub type ICount = i64;
+use crate::types::{Count, ICount, Key, Value};
 
 #[derive(Debug)]
 pub enum Ops {
     // Key Value
-    Set(Key, String),
+    Set(Key, Value),
     Get(Key),
     Del(Vec<Key>),
     Rename(Key, Key),
     // Sets
-    SAdd(Key, Vec<String>),
-    SRem(Key, Vec<String>),
+    SAdd(Key, Vec<Value>),
+    SRem(Key, Vec<Value>),
     SMembers(Key),
-    SIsMember(Key, String),
+    SIsMember(Key, Value),
     SCard(Key),
-    SDiff(Vec<String>),
-    SUnion(Vec<String>),
-    SInter(Vec<String>),
-    SDiffStore(Key, Vec<String>),
-    SUnionStore(Key, Vec<String>),
-    SInterStore(Key, Vec<String>),
+    SDiff(Vec<Value>),
+    SUnion(Vec<Value>),
+    SInter(Vec<Value>),
+    SDiffStore(Key, Vec<Value>),
+    SUnionStore(Key, Vec<Value>),
+    SInterStore(Key, Vec<Value>),
     SPop(Key, Option<Count>),
-    SMove(Key, Key, String),
+    SMove(Key, Key, Value),
     SRandMembers(Key, Option<ICount>),
     // Lists
-    LPush(Key, Vec<String>),
-    LPushX(Key, String),
+    LPush(Key, Vec<Value>),
+    LPushX(Key, Value),
     LLen(Key),
     LPop(Key),
     // Misc
@@ -49,13 +47,33 @@ pub enum OpsError {
     SyntaxError,
 }
 
+impl TryFrom<RedisValue> for Vec<u8> {
+    type Error = OpsError;
+
+    fn try_from(r: RedisValue) -> Result<Value, Self::Error> {
+        match r {
+            RedisValue::SimpleString(s) => Ok(s),
+            RedisValue::BulkString(s) => Ok(s),
+            _ => Err(OpsError::InvalidType),
+        }
+    }
+}
+
+impl TryFrom<&RedisValue> for Vec<u8> {
+    type Error = OpsError;
+
+    fn try_from(r: &RedisValue) -> Result<Value, Self::Error> {
+        Value::try_from(r.clone())
+    }
+}
+
 impl TryFrom<RedisValue> for String {
     type Error = OpsError;
 
     fn try_from(r: RedisValue) -> Result<String, Self::Error> {
         match r {
-            RedisValue::SimpleString(s) => Ok(s.to_string()),
-            RedisValue::BulkString(s) => Ok(s.to_string()),
+            RedisValue::SimpleString(s) => Ok(String::from_utf8_lossy(&s).to_string()),
+            RedisValue::BulkString(s) => Ok(String::from_utf8_lossy(&s).to_string()),
             _ => Err(OpsError::InvalidType),
         }
     }
@@ -75,10 +93,13 @@ impl TryFrom<&RedisValue> for ICount {
     fn try_from(r: &RedisValue) -> Result<ICount, Self::Error> {
         match r {
             RedisValue::Int(e) => Ok(*e as ICount),
-            RedisValue::SimpleString(s) => match s.parse::<ICount>() {
-                Ok(i) => Ok(i),
-                Err(_) => Err(OpsError::InvalidType),
-            },
+            RedisValue::SimpleString(s) => {
+                let s = String::from_utf8_lossy(&s);
+                match s.parse::<ICount>() {
+                    Ok(i) => Ok(i),
+                    Err(_) => Err(OpsError::InvalidType),
+                }
+            }
             _ => Err(OpsError::InvalidType),
         }
     }
@@ -90,16 +111,20 @@ impl TryFrom<&RedisValue> for Count {
     fn try_from(r: &RedisValue) -> Result<Count, Self::Error> {
         match r {
             RedisValue::Int(e) => Ok(*e as Count),
-            RedisValue::SimpleString(s) => match s.parse::<Count>() {
-                Ok(i) => Ok(i),
-                Err(_) => Err(OpsError::InvalidType),
-            },
+            RedisValue::SimpleString(s) => {
+                let s = String::from_utf8_lossy(&s);
+                match s.parse::<Count>() {
+                    Ok(i) => Ok(i),
+                    Err(_) => Err(OpsError::InvalidType),
+                }
+            }
             _ => Err(OpsError::InvalidType),
         }
     }
 }
 
-fn translate_string(start: &str) -> Result<Ops, OpsError> {
+fn translate_string(start: &[u8]) -> Result<Ops, OpsError> {
+    let start = &String::from_utf8_lossy(start);
     match start.to_lowercase().as_ref() {
         "ping" => Ok(Ops::Pong),
         "keys" => Ok(Ops::Keys),
@@ -115,11 +140,11 @@ fn all_strings(v: &[&RedisValue]) -> bool {
     })
 }
 
-fn tails_as_strings(tail: &[&RedisValue]) -> Result<Vec<String>, OpsError> {
+fn tails_as_strings(tail: &[&RedisValue]) -> Result<Vec<Value>, OpsError> {
     if !all_strings(&tail) {
         return Err(OpsError::InvalidType);
     }
-    let keys: Vec<String> = tail.iter().map(|x| String::try_from(*x).unwrap()).collect();
+    let keys: Vec<Value> = tail.iter().map(|x| Value::try_from(*x).unwrap()).collect();
     Ok(keys)
 }
 
@@ -137,20 +162,20 @@ fn verify_size(v: &[&RedisValue], size: usize) -> Result<(), OpsError> {
     Ok(())
 }
 
-fn get_key_and_val(array: &[RedisValue]) -> Result<(Key, String), OpsError> {
+fn get_key_and_val(array: &[RedisValue]) -> Result<(Key, Value), OpsError> {
     if array.len() < 3 {
         return Err(OpsError::WrongNumberOfArgs(3));
     }
-    let key = String::try_from(&array[1])?;
-    let val = String::try_from(&array[2])?;
+    let key = Key::try_from(&array[1])?;
+    let val = Value::try_from(&array[2])?;
     Ok((key, val))
 }
 
-fn get_key_and_tail(array: &[RedisValue]) -> Result<(Key, Vec<String>), OpsError> {
+fn get_key_and_tail(array: &[RedisValue]) -> Result<(Key, Vec<Value>), OpsError> {
     if array.len() < 3 {
         return Err(OpsError::WrongNumberOfArgs(3));
     }
-    let set_key = String::try_from(&array[1])?;
+    let set_key = Key::try_from(&array[1])?;
     let tail: Vec<_> = array.iter().skip(2).collect();
     let vals = tails_as_strings(&tail)?;
     Ok((set_key, vals))
@@ -160,11 +185,12 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
     if array.is_empty() {
         return Err(OpsError::Noop);
     }
-    let head: String = String::try_from(&array[0])?;
+    let head = Value::try_from(&array[0])?;
     if let Ok(op) = translate_string(&head) {
         return Ok(op);
     }
     let tail: Vec<&RedisValue> = array.iter().skip(1).collect();
+    let head = &String::from_utf8_lossy(&head);
     match head.to_lowercase().as_ref() {
         // Key-Value
         "set" => {
@@ -173,7 +199,7 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
         }
         "get" => {
             verify_size(&tail, 1)?;
-            let key = String::try_from(tail[0])?;
+            let key = Key::try_from(tail[0])?;
             Ok(Ops::Get(key))
         }
         "del" => {
@@ -183,8 +209,8 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
         }
         "rename" => {
             verify_size(&tail, 2)?;
-            let key = String::try_from(tail[0])?;
-            let new_key = String::try_from(tail[1])?;
+            let key = Key::try_from(tail[0])?;
+            let new_key = Key::try_from(tail[1])?;
             Ok(Ops::Rename(key, new_key))
         }
         "exists" => {
@@ -203,12 +229,12 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
         }
         "smembers" => {
             verify_size(&tail, 1)?;
-            let set_key = String::try_from(tail[0])?;
+            let set_key = Key::try_from(tail[0])?;
             Ok(Ops::SMembers(set_key))
         }
         "scard" => {
             verify_size(&tail, 1)?;
-            let key = String::try_from(tail[0])?;
+            let key = Key::try_from(tail[0])?;
             Ok(Ops::SCard(key))
         }
         "sdiff" => {
@@ -240,7 +266,7 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
         }
         "spop" => {
             verify_size_lower(&tail, 1)?;
-            let key = String::try_from(tail[0])?;
+            let key = Key::try_from(tail[0])?;
             let count = match tail.get(1) {
                 Some(c) => Some(Count::try_from(*c)?),
                 None => None,
@@ -253,14 +279,14 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
         }
         "smove" => {
             verify_size(&tail, 3)?;
-            let src = String::try_from(tail[0])?;
-            let dest = String::try_from(tail[1])?;
-            let member = String::try_from(tail[2])?;
+            let src = Key::try_from(tail[0])?;
+            let dest = Key::try_from(tail[1])?;
+            let member = Value::try_from(tail[2])?;
             Ok(Ops::SMove(src, dest, member))
         }
         "srandmember" => {
             verify_size_lower(&tail, 1)?;
-            let key = String::try_from(tail[0])?;
+            let key = Key::try_from(tail[0])?;
             let count = match tail.get(1) {
                 Some(c) => Some(ICount::try_from(*c)?),
                 None => None,
@@ -273,23 +299,23 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
         }
         "lpushx" => {
             verify_size(&tail, 2)?;
-            let key = String::try_from(tail[0])?;
-            let val = String::try_from(tail[1])?;
+            let key = Key::try_from(tail[0])?;
+            let val = Value::try_from(tail[1])?;
             Ok(Ops::LPushX(key, val))
         }
         "llen" => {
             verify_size(&tail, 1)?;
-            let key = String::try_from(tail[0])?;
+            let key = Key::try_from(tail[0])?;
             Ok(Ops::LLen(key))
         }
         "lpop" => {
             verify_size(&tail, 1)?;
-            let key = String::try_from(tail[0])?;
+            let key = Key::try_from(tail[0])?;
             Ok(Ops::LPop(key))
         }
         "linsert" => {
             verify_size(&tail, 1)?;
-            let key = String::try_from(tail[0])?;
+            let key = Key::try_from(tail[0])?;
             Ok(Ops::LPop(key))
         }
         _ => Err(OpsError::UnknownOp),

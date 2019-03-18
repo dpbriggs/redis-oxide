@@ -7,21 +7,27 @@ extern crate pretty_assertions;
 extern crate promptly;
 extern crate shlex;
 
+extern crate combine;
+
 use promptly::prompt;
 
-mod engine;
-mod resp;
+pub mod engine;
+pub mod ops;
+pub mod resp;
+pub mod server;
+pub mod types;
 
-use self::engine::engine::Engine;
-use self::engine::server::server;
-use self::resp::{ops::translate, resp::RedisValue};
+use self::engine::Engine;
+use self::server::server;
+use self::{ops::translate, types::RedisValue};
 use std::str::FromStr;
 
 fn main() {
     // let test_str = "set \"fo  o\" \"awdaw   ddw\"";
     // let test_str_two = "get \"fo  o\"";
     let engine = Engine::default();
-    server();
+    let set = "*3\r\n$3\r\nset\r\n$3\r\nfoo\r\n$3\r\nbar";
+    server().expect("server failed");
     loop {
         let line: String = prompt("> ");
         println!("{:?}", line);

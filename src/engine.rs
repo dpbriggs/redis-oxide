@@ -1,13 +1,13 @@
-use crate::resp::ops::Key;
 // use rand::Rng;
+use crate::ops::Ops;
+use crate::types::{EngineRes, Key, Value};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
 use std::sync::{Arc, RwLock};
-type KeyString = HashMap<Key, String>;
-type KeySet = HashMap<Key, HashSet<String>>;
-type KeyList = HashMap<Key, VecDeque<String>>;
 
-use crate::resp::ops::Ops;
+type KeyString = HashMap<Key, Value>;
+type KeySet = HashMap<Key, HashSet<Value>>;
+type KeyList = HashMap<Key, VecDeque<Value>>;
 
 #[derive(Default, Debug, Clone)]
 pub struct Engine {
@@ -16,25 +16,15 @@ pub struct Engine {
     lists: Arc<RwLock<KeyList>>,
 }
 
-#[derive(Debug)]
-pub enum EngineRes {
-    Ok,
-    StringRes(String),
-    Error(&'static str),
-    MultiStringRes(Vec<String>),
-    UIntRes(usize),
-    Nil,
-}
-
 impl fmt::Display for EngineRes {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             EngineRes::Ok => write!(f, "OK"),
-            EngineRes::StringRes(s) => write!(f, "{}", s),
-            EngineRes::UIntRes(i) => write!(f, "{}", i),
+            EngineRes::StringRes(s) => write!(f, "{:?}", s),
+            EngineRes::UIntRes(i) => write!(f, "{:?}", i),
             EngineRes::MultiStringRes(ss) => write!(f, "{:?}", ss),
             EngineRes::Nil => write!(f, "(nil)"),
-            EngineRes::Error(e) => write!(f, "ERR {}", e),
+            EngineRes::Error(e) => write!(f, "ERR {:?}", e),
         }
     }
 }
@@ -46,9 +36,9 @@ enum SetOp {
 }
 
 impl Engine {
-    fn many_set_op(&self, keys: Vec<String>, op: SetOp) -> Option<HashSet<String>> {
+    fn many_set_op(&self, keys: Vec<Key>, op: SetOp) -> Option<HashSet<Value>> {
         let engine_sets = self.sets.read().unwrap();
-        let sets: Vec<HashSet<String>> = keys
+        let sets: Vec<HashSet<Key>> = keys
             .iter()
             .filter_map(|key| engine_sets.get(key))
             .cloned()
@@ -57,7 +47,7 @@ impl Engine {
             return None;
         }
         // TODO: Figure this mess of cloning
-        let mut head: HashSet<String> = (*sets.first().unwrap()).to_owned();
+        let mut head: HashSet<Key> = (*sets.first().unwrap()).to_owned();
         for set in sets.iter().skip(1).cloned() {
             head = match op {
                 SetOp::Diff => head.difference(&set).cloned().collect(),
@@ -68,21 +58,21 @@ impl Engine {
         Some(head)
     }
 
-    fn create_list_if_necessary(&self, list_key: &str) {
+    fn create_list_if_necessary(&self, list_key: &Key) {
         if !self.lists.read().unwrap().contains_key(list_key) {
             self.lists
                 .write()
                 .unwrap()
-                .insert(list_key.to_string().clone(), VecDeque::new());
+                .insert(list_key.clone(), VecDeque::new());
         }
     }
 
-    fn create_set_if_necessary(&self, set_key: &str) {
+    fn create_set_if_necessary(&self, set_key: &Key) {
         if !self.sets.read().unwrap().contains_key(set_key) {
             self.sets
                 .write()
                 .unwrap()
-                .insert(set_key.to_string().clone(), HashSet::new());
+                .insert(set_key.clone(), HashSet::new());
         }
     }
 
@@ -93,7 +83,7 @@ impl Engine {
                 .read()
                 .unwrap()
                 .get(&key)
-                .map_or(EngineRes::Nil, |v| EngineRes::StringRes(v.to_string())),
+                .map_or(EngineRes::Nil, |v| EngineRes::StringRes(v.to_vec())),
             Ops::Set(key, value) => {
                 self.kv.write().unwrap().insert(key, value);
                 EngineRes::Ok
@@ -111,9 +101,9 @@ impl Engine {
                     self.kv.write().unwrap().insert(new_key, value);
                     EngineRes::Ok
                 }
-                None => EngineRes::Error("no such key"),
+                None => EngineRes::Error(b"no such key"),
             },
-            Ops::Pong => EngineRes::StringRes("PONG".to_string()),
+            Ops::Pong => EngineRes::StringRes(b"PONG".to_vec()),
             Ops::Exists(keys) => EngineRes::UIntRes(
                 keys.iter()
                     .map(|key| self.kv.read().unwrap().contains_key(key))
@@ -142,7 +132,7 @@ impl Engine {
                 EngineRes::UIntRes(vals_inserted)
             }
             Ops::SMembers(set_key) => match self.sets.read().unwrap().get(&set_key) {
-                Some(hs) => EngineRes::MultiStringRes(hs.iter().map(ToString::to_string).collect()),
+                Some(hs) => EngineRes::MultiStringRes(hs.iter().cloned().collect()),
                 None => EngineRes::MultiStringRes(vec![]),
             },
             Ops::SCard(set_key) => match self.sets.read().unwrap().get(&set_key) {
@@ -210,7 +200,7 @@ impl Engine {
                     return EngineRes::Nil;
                 }
                 let count = count.unwrap_or(1);
-                let eles: Vec<String> = set.iter().take(count).cloned().collect();
+                let eles: Vec<Value> = set.iter().take(count).cloned().collect();
                 for ele in eles.iter() {
                     set.remove(ele);
                 }
