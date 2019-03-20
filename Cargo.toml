@@ -1,7 +1,7 @@
 [package]
 name = "redis-oxide"
 version = "0.1.0"
-authors = ["David Briggs <dpbriggs@edu.uwaterloo.ca>"]
+authors = ["David Briggs <email@dpbriggs.ca>"]
 edition = "2018"
 
 [dependencies]
@@ -13,7 +13,7 @@ rand = "0.6.5"
 tokio-codec = "0.1.1"
 bytes = "0.4.12"
 combine = "3.8.1"
-partial-io = "0.3.0"
+partial-io = { version = "0.3", features = ["tokio", "quickcheck"] }
 futures = "0.1.25"
 
 [dev-dependencies]

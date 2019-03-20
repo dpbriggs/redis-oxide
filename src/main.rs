@@ -7,15 +7,17 @@ extern crate pretty_assertions;
 extern crate promptly;
 extern crate shlex;
 
+#[macro_use]
 extern crate combine;
 
 use promptly::prompt;
 
-pub mod engine;
-pub mod ops;
-pub mod resp;
-pub mod server;
-pub mod types;
+mod asyncresp;
+mod engine;
+mod ops;
+mod resp;
+mod server;
+mod types;
 
 use self::engine::Engine;
 use self::server::server;

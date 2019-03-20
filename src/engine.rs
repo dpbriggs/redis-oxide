@@ -58,21 +58,21 @@ impl Engine {
         Some(head)
     }
 
-    fn create_list_if_necessary(&self, list_key: &Key) {
+    fn create_list_if_necessary(&self, list_key: &[u8]) {
         if !self.lists.read().unwrap().contains_key(list_key) {
             self.lists
                 .write()
                 .unwrap()
-                .insert(list_key.clone(), VecDeque::new());
+                .insert(list_key.to_vec(), VecDeque::new());
         }
     }
 
-    fn create_set_if_necessary(&self, set_key: &Key) {
+    fn create_set_if_necessary(&self, set_key: &[u8]) {
         if !self.sets.read().unwrap().contains_key(set_key) {
             self.sets
                 .write()
                 .unwrap()
-                .insert(set_key.clone(), HashSet::new());
+                .insert(set_key.to_vec(), HashSet::new());
         }
     }
 

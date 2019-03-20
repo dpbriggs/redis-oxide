@@ -12,7 +12,9 @@ use tokio::prelude::*;
 pub fn server() -> Result<(), Box<std::error::Error>> {
     // Parse the address we're going to run this server on
     // and set up our TCP listener to accept connections.
-    let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
+    let addr = env::args()
+        .nth(1)
+        .unwrap_or_else(|| "127.0.0.1:8080".to_string());
     let addr = addr.parse::<SocketAddr>()?;
     let listener = TcpListener::bind(&addr).map_err(|_| "failed to bind")?;
     println!("Listening on: {}", addr);
