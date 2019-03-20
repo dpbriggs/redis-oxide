@@ -10,7 +10,7 @@ extern crate shlex;
 #[macro_use]
 extern crate combine;
 
-use promptly::prompt;
+
 
 mod asyncresp;
 mod engine;
@@ -21,8 +21,8 @@ mod types;
 
 use self::engine::Engine;
 use self::server::server;
-use self::{ops::translate, types::RedisValue};
-use std::str::FromStr;
+
+
 
 fn main() {
     // let test_str = "set \"fo  o\" \"awdaw   ddw\"";

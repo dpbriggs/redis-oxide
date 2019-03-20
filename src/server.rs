@@ -1,17 +1,13 @@
 use std::env;
 
 use std::net::SocketAddr;
-use std::sync::Arc;
 
 use crate::asyncresp::{MyError, RedisValueCodec};
 use crate::{engine::Engine, ops::translate, types::RedisValue};
-use futures::future;
-use std::io::BufReader;
-use std::str::FromStr;
-use tokio::io::{read_to_end, write_all};
+
 use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::*;
-use tokio_codec::{Decoder, Framed, LinesCodec};
+use tokio_codec::Decoder;
 
 fn process(socket: TcpStream, engine: Engine) {
     let (tx, rx) =
@@ -26,10 +22,10 @@ fn process(socket: TcpStream, engine: Engine) {
     let task = tx
         .send_all(rx.and_then(move |r: RedisValue| match translate(&r) {
             Ok(op) => {
-                let foo = engine.clone().exec(op);
-                Ok(RedisValue::from(foo))
+                let res = engine.clone().exec(op);
+                Ok(RedisValue::from(res))
             }
-            Err(_) => Ok(RedisValue::Error("Unknown Operation!".as_bytes().to_vec())),
+            Err(_) => Ok(RedisValue::Error(b"Unknown Operation!".to_vec())),
         }))
         .then(|res| {
             if let Err(e) = res {
@@ -41,15 +37,6 @@ fn process(socket: TcpStream, engine: Engine) {
 
     // Spawn the task that handles the connection.
     tokio::spawn(task);
-}
-
-fn respond(req: RedisValue) -> Box<Future<Item = RedisValue, Error = MyError> + Send> {
-    let f = future::lazy(move || {
-        let response = RedisValue::NullArray;
-        Ok(response)
-    });
-
-    Box::new(f)
 }
 
 pub fn server(engine: Engine) -> Result<(), MyError> {
