@@ -110,14 +110,14 @@ impl Engine {
                     .filter(|exists| *exists)
                     .count(),
             ),
-            Ops::Keys => EngineRes::MultiStringRes(
-                self.kv
-                    .read()
-                    .unwrap()
-                    .iter()
-                    .map(|(key, _)| key.clone())
-                    .collect(),
-            ),
+            Ops::Keys => {
+                let mut kv_keys: Vec<Key> = self.kv.read().unwrap().keys().cloned().collect();
+                let mut set_keys: Vec<Key> = self.sets.read().unwrap().keys().cloned().collect();
+                let mut list_keys: Vec<Key> = self.lists.read().unwrap().keys().cloned().collect();
+                kv_keys.append(&mut set_keys);
+                kv_keys.append(&mut list_keys);
+                EngineRes::MultiStringRes(kv_keys)
+            }
             Ops::SAdd(set_key, vals) => {
                 self.create_set_if_necessary(&set_key);
                 let mut sets = self.sets.write().unwrap();
