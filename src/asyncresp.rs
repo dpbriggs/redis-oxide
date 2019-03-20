@@ -16,11 +16,12 @@ use futures::{Async, Future, Poll};
 use tokio::codec::{Decoder, Encoder};
 // #[allow(unused_imports)]
 // use tokio::AsyncRead;
+use std::net::AddrParseError;
 
 use combine;
 #[allow(unused_imports)]
 use combine::byte::{byte, crlf, take_until_bytes};
-use combine::combinator::{any_partial_state, AnyPartialState};
+use combine::combinator::{any_send_partial_state, AnySendPartialState};
 #[allow(unused_imports)] // See https://github.com/rust-lang/rust/issues/43970
 use combine::error::StreamError;
 #[allow(unused_imports)]
@@ -67,7 +68,7 @@ where
 }
 
 parser! {
-   type PartialState = AnyPartialState;
+   type PartialState = AnySendPartialState;
    fn redis_parser['a, I]()(I) -> Result<RedisValue, String>
     where [I: FullRangeStream<Item = u8, Range = &'a [u8]> ] {
        let word = || recognize(take_until_bytes(&b"\r\n"[..]).with(take(2).map(|_| ())));
@@ -112,7 +113,7 @@ parser! {
            }
        });
 
-       any_partial_state(choice((
+       any_send_partial_state(choice((
            byte(b'+').with(simple_string().map(Ok)),
            byte(b':').with(int().map(RedisValue::Int).map(Ok)),
            byte(b'-').with(error().map(Ok)),
@@ -125,12 +126,30 @@ parser! {
 #[derive(Debug)]
 pub enum MyError {
     IOError(std::io::Error),
+    AddrParseError(String),
     Else(String),
+}
+
+impl From<std::net::AddrParseError> for MyError {
+    fn from(err: AddrParseError) -> MyError {
+        MyError::AddrParseError(err.to_string())
+    }
 }
 
 impl From<String> for MyError {
     fn from(err: String) -> MyError {
         MyError::Else(err)
+    }
+}
+
+impl From<MyError> for std::io::Error {
+    fn from(err: MyError) -> std::io::Error {
+        if let MyError::IOError(e) = err {
+            return e;
+        }
+        // TODO: Not do this, or even have this impl
+        println!("{:?}", err);
+        std::io::Error::new(std::io::ErrorKind::InvalidData, "oh no")
     }
 }
 
@@ -142,7 +161,7 @@ impl From<io::Error> for MyError {
 
 #[derive(Default)]
 pub struct RedisValueCodec {
-    state: AnyPartialState,
+    state: AnySendPartialState,
 }
 
 impl Decoder for RedisValueCodec {
