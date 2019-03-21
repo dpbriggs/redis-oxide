@@ -42,9 +42,32 @@ pub enum OpsError {
     Noop,
     UnknownOp,
     NotEnoughArgs(usize),
-    WrongNumberOfArgs(usize),
+    WrongNumberOfArgs(usize, usize),
     InvalidType,
     SyntaxError,
+}
+
+impl From<OpsError> for RedisValue {
+    fn from(op: OpsError) -> RedisValue {
+        match op {
+            OpsError::InvalidStart => RedisValue::Error(b"Invalid start!".to_vec()),
+            OpsError::UnknownOp => RedisValue::Error(b"Unknown Operation!".to_vec()),
+            OpsError::NotEnoughArgs(missing) => {
+                let f = format!("Not enough arguments, {} missing!", missing);
+                RedisValue::Error(f.as_bytes().to_vec())
+            }
+            OpsError::WrongNumberOfArgs(required, given) => {
+                let f = format!(
+                    "Wrong number of arguments! ({} required, {} given)",
+                    required, given
+                );
+                RedisValue::Error(f.as_bytes().to_vec())
+            }
+            OpsError::InvalidType => RedisValue::Error(b"Invalid Type!".to_vec()),
+            OpsError::SyntaxError => RedisValue::Error(b"Syntax Error!".to_vec()),
+            OpsError::Noop => RedisValue::Error(b"".to_vec()),
+        }
+    }
 }
 
 impl TryFrom<RedisValue> for Vec<u8> {
@@ -139,14 +162,14 @@ fn verify_size_lower(v: &[&RedisValue], min_size: usize) -> Result<(), OpsError>
 
 fn verify_size(v: &[&RedisValue], size: usize) -> Result<(), OpsError> {
     if v.len() != size {
-        return Err(OpsError::WrongNumberOfArgs(size));
+        return Err(OpsError::WrongNumberOfArgs(size, v.len()));
     }
     Ok(())
 }
 
 fn get_key_and_val(array: &[RedisValue]) -> Result<(Key, Value), OpsError> {
     if array.len() < 3 {
-        return Err(OpsError::WrongNumberOfArgs(3));
+        return Err(OpsError::WrongNumberOfArgs(3, array.len()));
     }
     let key = Key::try_from(&array[1])?;
     let val = Value::try_from(&array[2])?;
@@ -155,7 +178,7 @@ fn get_key_and_val(array: &[RedisValue]) -> Result<(Key, Value), OpsError> {
 
 fn get_key_and_tail(array: &[RedisValue]) -> Result<(Key, Vec<Value>), OpsError> {
     if array.len() < 3 {
-        return Err(OpsError::WrongNumberOfArgs(3));
+        return Err(OpsError::WrongNumberOfArgs(3, array.len()));
     }
     let set_key = Key::try_from(&array[1])?;
     let tail: Vec<_> = array.iter().skip(2).collect();

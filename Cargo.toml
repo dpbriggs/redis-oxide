@@ -15,6 +15,7 @@ bytes = "0.4.12"
 combine = "3.8.1"
 partial-io = { version = "0.3", features = ["tokio", "quickcheck"] }
 futures = "0.1.25"
+futures-locks = "0.3.3"
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"

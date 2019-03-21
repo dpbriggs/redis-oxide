@@ -25,7 +25,7 @@ fn process(socket: TcpStream, engine: Engine) {
                 let res = engine.clone().exec(op);
                 Ok(RedisValue::from(res))
             }
-            Err(_) => Ok(RedisValue::Error(b"Unknown Operation!".to_vec())),
+            Err(e) => Ok(RedisValue::from(e)),
         }))
         .then(|res| {
             if let Err(e) = res {

@@ -10,8 +10,6 @@ extern crate shlex;
 #[macro_use]
 extern crate combine;
 
-
-
 mod asyncresp;
 mod engine;
 mod ops;
@@ -21,8 +19,6 @@ mod types;
 
 use self::engine::Engine;
 use self::server::server;
-
-
 
 fn main() {
     // let test_str = "set \"fo  o\" \"awdaw   ddw\"";
