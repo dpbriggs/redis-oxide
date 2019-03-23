@@ -42,7 +42,9 @@ fn process(socket: TcpStream, engine: Engine) {
 pub fn server(engine: Engine) -> Result<(), MyError> {
     // Parse the address we're going to run this server on
     // and set up our TCP listener to accept connections.
-    let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
+    let addr = env::args()
+        .nth(1)
+        .unwrap_or_else(|| "127.0.0.1:8080".to_string());
     let addr = addr.parse::<SocketAddr>().expect("Cannot bind to port!");
 
     let listener = TcpListener::bind(&addr).expect("it to work");

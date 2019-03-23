@@ -5,18 +5,15 @@ use std::io::{self, BufRead};
 use std::str;
 
 #[allow(unused_imports)]
-// use types::{make_extension_error, ErrorKind, RedisError, RedisResult, Value};
 use crate::types::{Key, RedisValue, Value, EMPTY_ARRAY, NULL_ARRAY, NULL_BULK_STRING};
 
 #[allow(unused_imports)]
 use bytes::BytesMut;
 #[allow(unused_imports)]
 use futures::{Async, Future, Poll};
+use std::net::AddrParseError;
 #[allow(unused_imports)]
 use tokio::codec::{Decoder, Encoder};
-// #[allow(unused_imports)]
-// use tokio::AsyncRead;
-use std::net::AddrParseError;
 
 use combine;
 #[allow(unused_imports)]

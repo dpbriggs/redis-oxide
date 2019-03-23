@@ -277,6 +277,47 @@ impl Engine {
                 Some(v) => EngineRes::StringRes(v),
                 None => EngineRes::Nil,
             },
+            Ops::RPop(key) => match self
+                .lists
+                .write()
+                .unwrap()
+                .get_mut(&key)
+                .and_then(VecDeque::pop_back)
+            {
+                Some(v) => EngineRes::StringRes(v),
+                None => EngineRes::Nil,
+            },
+            Ops::RPush(key, vals) => {
+                self.create_list_if_necessary(&key);
+                let mut lists = self.lists.write().unwrap();
+                let list = lists.get_mut(&key).unwrap();
+                for val in vals {
+                    list.push_back(val)
+                }
+                EngineRes::UIntRes(list.len())
+            }
+            Ops::RPushX(key, val) => {
+                if !self.lists.read().unwrap().contains_key(&key) {
+                    return EngineRes::UIntRes(0);
+                }
+                self.create_list_if_necessary(&key);
+                let mut lists = self.lists.write().unwrap();
+                let list = lists.get_mut(&key).unwrap();
+                list.push_back(val);
+                EngineRes::UIntRes(list.len())
+            }
+            Ops::LIndex(key, index) => match self.lists.read().unwrap().get(&key) {
+                Some(list) => {
+                    let llen = list.len() as i64;
+                    let real_index = if index < 0 { llen + index } else { index };
+                    if !(0 <= real_index && real_index < llen) {
+                        return EngineRes::Error(b"Bad Range!");
+                    }
+                    let real_index = real_index as usize;
+                    EngineRes::StringRes(list[real_index].to_vec())
+                }
+                None => EngineRes::Error(b"No list at key!"),
+            },
         }
     }
 }

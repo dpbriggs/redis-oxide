@@ -1,7 +1,7 @@
 use crate::types::RedisValue;
 use std::convert::TryFrom;
 
-use crate::types::{Count, Key, Value};
+use crate::types::{Count, Index, Key, Value};
 
 #[derive(Debug)]
 pub enum Ops {
@@ -30,6 +30,10 @@ pub enum Ops {
     LPushX(Key, Value),
     LLen(Key),
     LPop(Key),
+    RPop(Key),
+    RPush(Key, Vec<Value>),
+    RPushX(Key, Value),
+    LIndex(Key, Index),
     // Misc
     Keys, // TODO: Add optional glob
     Exists(Vec<Key>),
@@ -116,7 +120,7 @@ impl TryFrom<&RedisValue> for Count {
     fn try_from(r: &RedisValue) -> Result<Count, Self::Error> {
         match r {
             RedisValue::Int(e) => Ok(*e as Count),
-            RedisValue::SimpleString(s) => {
+            RedisValue::SimpleString(s) | RedisValue::BulkString(s) => {
                 let s = String::from_utf8_lossy(&s);
                 match s.parse::<Count>() {
                     Ok(i) => Ok(i),
@@ -302,11 +306,21 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
             let (key, vals) = get_key_and_tail(array)?;
             Ok(Ops::LPush(key, vals))
         }
+        "rpush" => {
+            let (key, vals) = get_key_and_tail(array)?;
+            Ok(Ops::RPush(key, vals))
+        }
         "lpushx" => {
             verify_size(&tail, 2)?;
             let key = Key::try_from(tail[0])?;
             let val = Value::try_from(tail[1])?;
             Ok(Ops::LPushX(key, val))
+        }
+        "rpushx" => {
+            verify_size(&tail, 2)?;
+            let key = Key::try_from(tail[0])?;
+            let val = Value::try_from(tail[1])?;
+            Ok(Ops::RPushX(key, val))
         }
         "llen" => {
             verify_size(&tail, 1)?;
@@ -318,10 +332,21 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
             let key = Key::try_from(tail[0])?;
             Ok(Ops::LPop(key))
         }
+        "rpop" => {
+            verify_size(&tail, 1)?;
+            let key = Key::try_from(tail[0])?;
+            Ok(Ops::RPop(key))
+        }
         "linsert" => {
             verify_size(&tail, 1)?;
             let key = Key::try_from(tail[0])?;
             Ok(Ops::LPop(key))
+        }
+        "lindex" => {
+            verify_size(&tail, 2)?;
+            let key = Key::try_from(tail[0])?;
+            let index = Index::try_from(tail[1])?;
+            Ok(Ops::LIndex(key, index))
         }
         _ => Err(OpsError::UnknownOp),
     }

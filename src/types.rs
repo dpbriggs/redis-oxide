@@ -4,6 +4,7 @@ pub type Value = Vec<u8>;
 pub type Key = Vec<u8>;
 /// Count is used for commands that count.
 pub type Count = i64;
+pub type Index = i64;
 
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, Clone)]
