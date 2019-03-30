@@ -104,6 +104,12 @@ impl Engine {
                 None => EngineRes::Error(b"no such key"),
             },
             Ops::Pong => EngineRes::StringRes(b"PONG".to_vec()),
+            Ops::FlushAll => {
+                self.kv.write().unwrap().clear();
+                self.sets.write().unwrap().clear();
+                self.lists.write().unwrap().clear();
+                EngineRes::Ok
+            }
             Ops::Exists(keys) => EngineRes::UIntRes(
                 keys.iter()
                     .map(|key| self.kv.read().unwrap().contains_key(key))
@@ -316,8 +322,76 @@ impl Engine {
                     let real_index = real_index as usize;
                     EngineRes::StringRes(list[real_index].to_vec())
                 }
+                None => EngineRes::Nil,
+            },
+            Ops::LSet(key, index, value) => match self.lists.write().unwrap().get_mut(&key) {
+                Some(list) => {
+                    let llen = list.len() as i64;
+                    let real_index = if index < 0 { llen + index } else { index };
+                    if !(0 <= real_index && real_index < llen) {
+                        return EngineRes::Error(b"Bad Range!");
+                    }
+                    let real_index = real_index as usize;
+                    list[real_index] = value;
+                    EngineRes::Ok
+                }
                 None => EngineRes::Error(b"No list at key!"),
             },
+            Ops::LRange(key, start_index, end_index) => {
+                match self.lists.read().unwrap().get(&key) {
+                    Some(list) => {
+                        let start_index = std::cmp::max(
+                            0,
+                            if start_index < 0 { 0 } else { start_index } as usize,
+                        );
+                        let end_index = std::cmp::min(
+                            list.len(),
+                            if end_index < 0 {
+                                list.len() as i64 + end_index
+                            } else {
+                                end_index
+                            } as usize,
+                        );
+                        let mut ret = Vec::new();
+                        for (index, value) in list.iter().enumerate() {
+                            if start_index <= index && index <= end_index {
+                                ret.push(value.clone());
+                            }
+                            if index > end_index {
+                                break;
+                            }
+                        }
+                        EngineRes::MultiStringRes(ret)
+                    }
+                    None => EngineRes::MultiStringRes(vec![]),
+                }
+            }
+            Ops::LTrim(key, start_index, end_index) => {
+                match self.lists.write().unwrap().get_mut(&key) {
+                    Some(list) => {
+                        let start_index = std::cmp::max(
+                            0,
+                            if start_index < 0 { 0 } else { start_index } as usize,
+                        );
+                        let end_index = std::cmp::min(
+                            list.len(),
+                            if end_index < 0 {
+                                list.len() as i64 + end_index
+                            } else {
+                                end_index
+                            } as usize,
+                        ) + 1;
+                        // Deal with right side
+                        list.truncate(end_index);
+                        // Deal with left side
+                        for _ in 0..start_index {
+                            list.pop_front();
+                        }
+                        EngineRes::Ok
+                    }
+                    None => EngineRes::Ok,
+                }
+            }
         }
     }
 }

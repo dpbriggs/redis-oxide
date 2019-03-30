@@ -44,7 +44,7 @@ pub fn server(engine: Engine) -> Result<(), MyError> {
     // and set up our TCP listener to accept connections.
     let addr = env::args()
         .nth(1)
-        .unwrap_or_else(|| "127.0.0.1:8080".to_string());
+        .unwrap_or_else(|| "127.0.0.1:6379".to_string());
     let addr = addr.parse::<SocketAddr>().expect("Cannot bind to port!");
 
     let listener = TcpListener::bind(&addr).expect("it to work");

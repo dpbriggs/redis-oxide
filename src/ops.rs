@@ -12,32 +12,36 @@ pub enum Ops {
     Rename(Key, Key),
     // Sets
     SAdd(Key, Vec<Value>),
-    SRem(Key, Vec<Value>),
-    SMembers(Key),
-    SIsMember(Key, Value),
     SCard(Key),
     SDiff(Vec<Value>),
-    SUnion(Vec<Value>),
-    SInter(Vec<Value>),
     SDiffStore(Key, Vec<Value>),
-    SUnionStore(Key, Vec<Value>),
+    SInter(Vec<Value>),
     SInterStore(Key, Vec<Value>),
-    SPop(Key, Option<Count>),
+    SIsMember(Key, Value),
+    SMembers(Key),
     SMove(Key, Key, Value),
+    SPop(Key, Option<Count>),
     SRandMembers(Key, Option<Count>),
+    SRem(Key, Vec<Value>),
+    SUnion(Vec<Value>),
+    SUnionStore(Key, Vec<Value>),
     // Lists
-    LPush(Key, Vec<Value>),
-    LPushX(Key, Value),
+    LIndex(Key, Index),
     LLen(Key),
     LPop(Key),
+    LPush(Key, Vec<Value>),
+    LPushX(Key, Value),
+    LRange(Key, Index, Index),
+    LSet(Key, Index, Value),
+    LTrim(Key, Index, Index),
     RPop(Key),
     RPush(Key, Vec<Value>),
     RPushX(Key, Value),
-    LIndex(Key, Index),
     // Misc
     Keys, // TODO: Add optional glob
     Exists(Vec<Key>),
     Pong,
+    FlushAll,
 }
 
 #[derive(Debug)]
@@ -137,6 +141,7 @@ fn translate_string(start: &[u8]) -> Result<Ops, OpsError> {
     match start.to_lowercase().as_ref() {
         "ping" => Ok(Ops::Pong),
         "keys" => Ok(Ops::Keys),
+        "flushall" => Ok(Ops::FlushAll),
         _ => Err(OpsError::UnknownOp),
     }
 }
@@ -347,6 +352,27 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
             let key = Key::try_from(tail[0])?;
             let index = Index::try_from(tail[1])?;
             Ok(Ops::LIndex(key, index))
+        }
+        "lset" => {
+            verify_size(&tail, 3)?;
+            let key = Key::try_from(tail[0])?;
+            let index = Index::try_from(tail[1])?;
+            let value = Value::try_from(tail[2])?;
+            Ok(Ops::LSet(key, index, value))
+        }
+        "lrange" => {
+            verify_size(&tail, 3)?;
+            let key = Key::try_from(tail[0])?;
+            let start_index = Index::try_from(tail[1])?;
+            let end_index = Index::try_from(tail[2])?;
+            Ok(Ops::LRange(key, start_index, end_index))
+        }
+        "ltrim" => {
+            verify_size(&tail, 3)?;
+            let key = Key::try_from(tail[0])?;
+            let start_index = Index::try_from(tail[1])?;
+            let end_index = Index::try_from(tail[2])?;
+            Ok(Ops::LTrim(key, start_index, end_index))
         }
         _ => Err(OpsError::UnknownOp),
     }

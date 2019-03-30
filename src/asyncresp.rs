@@ -48,15 +48,14 @@ where
         I: IntoIterator<Item = Result<U, E>>,
     {
         let mut returned_err = None;
-        match self.0 {
-            Ok(ref mut elems) => elems.extend(iter.into_iter().scan((), |_, item| match item {
+        if let Ok(ref mut elems) = self.0 {
+            elems.extend(iter.into_iter().scan((), |_, item| match item {
                 Ok(item) => Some(item),
                 Err(err) => {
                     returned_err = Some(err);
                     None
                 }
-            })),
-            Err(_) => (),
+            }))
         }
         if let Some(err) = returned_err {
             self.0 = Err(err);
