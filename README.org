@@ -4,6 +4,8 @@
 
 * Redis Oxide
 
+[[https://travis-ci.org/dpbriggs/redis-oxide.svg?branch=master][https://travis-ci.org/dpbriggs/redis-oxide.svg?branch=master]]
+
 This project is intended to be a more-or-less drop in replacement for redis.
 It's under construction at the moment.
 
