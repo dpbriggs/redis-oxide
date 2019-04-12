@@ -4,6 +4,9 @@ use crate::types::{EngineRes, Key, Value};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
 use std::sync::{Arc, RwLock};
+use std::time::{Duration, Instant};
+use tokio::prelude::*;
+use tokio::timer::Delay;
 
 type KeyString = HashMap<Key, Value>;
 type KeySet = HashMap<Key, HashSet<Value>>;
@@ -25,6 +28,8 @@ impl fmt::Display for EngineRes {
             EngineRes::MultiStringRes(ss) => write!(f, "{:?}", ss),
             EngineRes::Nil => write!(f, "(nil)"),
             EngineRes::Error(e) => write!(f, "ERR {:?}", e),
+            EngineRes::FutureRes(v, _) => (*v).fmt(f),
+            EngineRes::FutureResValue(_) => unreachable!(),
         }
     }
 }
@@ -85,8 +90,14 @@ impl Engine {
                 .get(&key)
                 .map_or(EngineRes::Nil, |v| EngineRes::StringRes(v.to_vec())),
             Ops::Set(key, value) => {
-                self.kv.write().unwrap().insert(key, value);
-                EngineRes::Ok
+                self.kv.write().unwrap().insert(key.clone(), value);
+                let primative_ttl = Delay::new(Instant::now() + Duration::from_millis(3000))
+                    .and_then(move |_| {
+                        self.clone().exec(Ops::Del(vec![key]));
+                        Ok(())
+                    })
+                    .map_err(|e| panic!("delay errored; err={:?}", e));
+                EngineRes::FutureRes(Box::new(EngineRes::Ok), Box::new(primative_ttl))
             }
             Ops::Del(keys) => {
                 let deleted = keys
@@ -390,6 +401,26 @@ impl Engine {
                         EngineRes::Ok
                     }
                     None => EngineRes::Ok,
+                }
+            }
+            Ops::RPopLPush(source, dest) => {
+                if source != dest {
+                    self.create_list_if_necessary(&dest);
+                }
+                let mut lists = self.lists.write().unwrap();
+                match lists.get_mut(&source) {
+                    None => EngineRes::Nil,
+                    Some(source_list) => match source_list.pop_back() {
+                        None => EngineRes::Nil,
+                        Some(value) => {
+                            if source == dest {
+                                source_list.push_back(value.clone());
+                            } else {
+                                lists.get_mut(&dest).unwrap().push_back(value.clone());
+                            }
+                            EngineRes::StringRes(value)
+                        }
+                    },
                 }
             }
         }

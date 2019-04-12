@@ -6,6 +6,10 @@ pub type Key = Vec<u8>;
 pub type Count = i64;
 pub type Index = i64;
 
+extern crate futures;
+
+use futures::future::Future;
+
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, Clone)]
 pub enum RedisValue {
@@ -22,7 +26,6 @@ pub const NULL_BULK_STRING: &str = "$-1\r\n";
 pub const NULL_ARRAY: &str = "*-1\r\n";
 pub const EMPTY_ARRAY: &str = "*0\r\n";
 
-#[derive(Debug)]
 pub enum EngineRes {
     Ok,
     StringRes(Value),
@@ -30,4 +33,7 @@ pub enum EngineRes {
     MultiStringRes(Vec<Value>),
     UIntRes(usize),
     Nil,
+    FutureRes(Box<EngineRes>, Box<Future<Item = (), Error = ()> + Send>),
+    // TODO: Figure out how to get EngineRes out of this.
+    FutureResValue(Box<Future<Item = (), Error = ()> + Send>),
 }

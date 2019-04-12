@@ -1,5 +1,7 @@
 #![feature(const_fn)]
 #![feature(const_str_len)]
+#![deny(unsafe_code)]
+#![feature(await_macro, async_await, futures_api)]
 #[macro_use]
 extern crate nom;
 #[cfg(test)]

@@ -3,7 +3,7 @@ use std::convert::TryFrom;
 
 use crate::types::{Count, Index, Key, Value};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Ops {
     // Key Value
     Set(Key, Value),
@@ -37,6 +37,7 @@ pub enum Ops {
     RPop(Key),
     RPush(Key, Vec<Value>),
     RPushX(Key, Value),
+    RPopLPush(Key, Key),
     // Misc
     Keys, // TODO: Add optional glob
     Exists(Vec<Key>),
@@ -374,6 +375,13 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
             let end_index = Index::try_from(tail[2])?;
             Ok(Ops::LTrim(key, start_index, end_index))
         }
+        "rpoplpush" => {
+            verify_size(&tail, 2)?;
+            let source = Key::try_from(tail[0])?;
+            let dest = Key::try_from(tail[1])?;
+            Ok(Ops::RPopLPush(source, dest))
+        }
+
         _ => Err(OpsError::UnknownOp),
     }
 }

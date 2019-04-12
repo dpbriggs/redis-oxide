@@ -19,6 +19,8 @@ impl From<EngineRes> for RedisValue {
             ),
             EngineRes::UIntRes(i) => RedisValue::Int(i as i64),
             EngineRes::Error(e) => RedisValue::Error(e.to_vec()),
+            EngineRes::FutureRes(s, _) => RedisValue::from(*s),
+            EngineRes::FutureResValue(_) => unreachable!(),
         }
     }
 }
