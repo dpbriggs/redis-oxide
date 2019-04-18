@@ -4,9 +4,6 @@ use crate::types::{EngineRes, Key, Value};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
 use std::sync::{Arc, RwLock};
-use std::time::{Duration, Instant};
-use tokio::prelude::*;
-use tokio::timer::Delay;
 
 type KeyString = HashMap<Key, Value>;
 type KeySet = HashMap<Key, HashSet<Value>>;
@@ -91,13 +88,7 @@ impl Engine {
                 .map_or(EngineRes::Nil, |v| EngineRes::StringRes(v.to_vec())),
             Ops::Set(key, value) => {
                 self.kv.write().unwrap().insert(key.clone(), value);
-                let primative_ttl = Delay::new(Instant::now() + Duration::from_millis(3000))
-                    .and_then(move |_| {
-                        self.clone().exec(Ops::Del(vec![key]));
-                        Ok(())
-                    })
-                    .map_err(|e| panic!("delay errored; err={:?}", e));
-                EngineRes::FutureRes(Box::new(EngineRes::Ok), Box::new(primative_ttl))
+                EngineRes::Ok
             }
             Ops::Del(keys) => {
                 let deleted = keys
@@ -188,7 +179,7 @@ impl Engine {
                 }
                 None => EngineRes::UIntRes(0),
             },
-            Ops::SUnionStore(to_store, keys) => match self.many_set_op(keys, SetOp::Inter) {
+            Ops::SUnionStore(to_store, keys) => match self.many_set_op(keys, SetOp::Union) {
                 Some(hash_set) => {
                     let hash_set_size = hash_set.len();
                     self.sets.write().unwrap().insert(to_store, hash_set);

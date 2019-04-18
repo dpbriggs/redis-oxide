@@ -6,8 +6,6 @@ pub type Key = Vec<u8>;
 pub type Count = i64;
 pub type Index = i64;
 
-extern crate futures;
-
 use futures::future::Future;
 
 #[allow(dead_code)]
