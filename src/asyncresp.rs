@@ -1,31 +1,20 @@
 use std::convert::From;
-#[allow(unused_imports)]
-use std::io::{self, BufRead};
-#[allow(unused_imports)]
+use std::io;
 use std::str;
 
-#[allow(unused_imports)]
-use crate::types::{Key, RedisValue, Value, EMPTY_ARRAY, NULL_ARRAY, NULL_BULK_STRING};
+use crate::types::{RedisValue, NULL_ARRAY, NULL_BULK_STRING};
 
-#[allow(unused_imports)]
 use bytes::BytesMut;
-#[allow(unused_imports)]
-use futures::{Async, Future, Poll};
 use std::net::AddrParseError;
-#[allow(unused_imports)]
 use tokio::codec::{Decoder, Encoder};
 
 use combine;
-#[allow(unused_imports)]
 use combine::byte::{byte, crlf, take_until_bytes};
 use combine::combinator::{any_send_partial_state, AnySendPartialState};
 #[allow(unused_imports)] // See https://github.com/rust-lang/rust/issues/43970
 use combine::error::StreamError;
-#[allow(unused_imports)]
 use combine::parser::choice::choice;
-#[allow(unused_imports)]
 use combine::range::{recognize, take};
-#[allow(unused_imports)]
 use combine::stream::{FullRangeStream, StreamErrorFor};
 
 struct ResultExtend<T, E>(Result<T, E>);

@@ -1,15 +1,17 @@
 use std::env;
 
-use std::net::SocketAddr;
-
 use crate::asyncresp::{MyError, RedisValueCodec};
 use crate::logger::LOGGER;
 use crate::{
     ops::translate,
     types::{Engine, RedisValue},
 };
+use futures::future::lazy;
+use std::net::SocketAddr;
+use std::time::{Duration, Instant};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::*;
+use tokio::timer::Interval;
 use tokio_codec::Decoder;
 
 fn process(socket: TcpStream, engine: Engine) {
@@ -46,8 +48,18 @@ fn process(socket: TcpStream, engine: Engine) {
     tokio::spawn(task);
 }
 
-pub fn server(engine: Engine) -> Result<(), MyError> {
-    // Parse the address we're going to run this server on
+fn save_state(engine: Engine) -> impl Future<Item = (), Error = ()> {
+    Interval::new(Instant::now(), Duration::from_millis(60 * 1000))
+        .skip(1)
+        .for_each(move |_| {
+            info!(LOGGER, "Saving state...");
+            debug!(LOGGER, "state: {:?}", engine.save_state());
+            Ok(())
+        })
+        .map_err(|e| error!(LOGGER, "save state failed; err={:?}", e))
+}
+
+fn socket_listener(engine: Engine) -> impl Future<Item = (), Error = ()> {
     // and set up our redis server.
     let addr = env::args()
         .nth(1)
@@ -55,16 +67,25 @@ pub fn server(engine: Engine) -> Result<(), MyError> {
     let addr = addr.parse::<SocketAddr>().expect("Cannot bind to port!");
 
     let listener = TcpListener::bind(&addr).expect("it to work");
-    println!("Listening on: {}", addr);
+    info!(LOGGER, "Listening on: {}", addr);
+    listener
+        .incoming()
+        .map_err(|e| println!("failed to accept socket; error = {:?}", e))
+        .for_each(move |socket| {
+            process(socket, engine.clone());
+            Ok(())
+        })
+        .map_err(|e| panic!("Failed to start server! error = {:?}", e))
+}
 
-    tokio::run({
-        listener
-            .incoming()
-            .map_err(|e| println!("failed to accept socket; error = {:?}", e))
-            .for_each(move |socket| {
-                process(socket, engine.clone());
-                Ok(())
-            })
-    });
+pub fn server(engine: Engine) -> Result<(), MyError> {
+    // Parse the address we're going to run this server on
+    // tokio::spawn(save_state(engine.clone()));
+    tokio::run(lazy(move || {
+        tokio::spawn(save_state(engine.clone()));
+        tokio::spawn(socket_listener(engine.clone()));
+        Ok(())
+    }));
+    println!("here");
     Ok(())
 }

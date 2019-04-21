@@ -1,5 +1,6 @@
 // use futures::future::Future;
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::convert::From;
 use std::sync::{Arc, RwLock};
 
 /// These types are used by engine and ops to actually perform useful work.
@@ -34,8 +35,8 @@ pub enum EngineRes {
     MultiStringRes(Vec<Value>),
     UIntRes(usize),
     Nil,
+    // TODO: Figure out how to get the futures working properly.
     // FutureRes(Box<EngineRes>, Box<Future<Item = (), Error = ()> + Send>),
-    // TODO: Figure out how to get EngineRes out of this.
     // FutureResValue(Box<Future<Item = (), Error = ()> + Send>),
 }
 
@@ -48,21 +49,6 @@ impl EngineRes {
     }
 }
 
-// impl std::fmt::Debug for EngineRes {
-//     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-//         match self {
-//             EngineRes::Ok => write!(f, "EngineRes::Ok"),
-//             EngineRes::StringRes(s) => write!(f, "EngineRes::StringRes({:?})", s),
-//             EngineRes::Error(e) => write!(f, "EngineRes::Error({:?})", e),
-//             EngineRes::MultiStringRes(v) => write!(f, "EngineRes::MultiStringRes({:?})", v),
-//             EngineRes::UIntRes(u) => write!(f, "EngineRes::UIntRes({:?})", u),
-//             EngineRes::Nil => write!(f, "EngineRes::Nil"),
-//             EngineRes::FutureRes(b, _) => write!(f, "{:?} PLUS FUTURE (UNKNOWN)", b),
-//             EngineRes::FutureResValue(_) => write!(f, "UNKNOWN FUTURE RES"),
-//         }
-//     }
-// }
-
 type KeyString = HashMap<Key, Value>;
 type KeySet = HashMap<Key, HashSet<Value>>;
 type KeyList = HashMap<Key, VecDeque<Value>>;
@@ -74,6 +60,28 @@ pub struct Engine {
     pub lists: Arc<RwLock<KeyList>>,
 }
 
-// pub trait Exec: Clone + Debug {
-//     fn exec(self, engine: Engine) -> EngineRes;
-// }
+#[derive(Serialize, Deserialize)]
+pub struct Database {
+    pub kv: Vec<u8>,
+    pub sets: Vec<u8>,
+    pub lists: Vec<u8>,
+}
+
+impl From<EngineRes> for RedisValue {
+    fn from(engine_res: EngineRes) -> Self {
+        match engine_res {
+            EngineRes::Ok => RedisValue::SimpleString(vec![b'O', b'K']),
+            EngineRes::Nil => RedisValue::NullBulkString,
+            EngineRes::StringRes(s) => RedisValue::BulkString(s),
+            EngineRes::MultiStringRes(a) => RedisValue::Array(
+                a.iter()
+                    .map(|s| RedisValue::BulkString(s.to_vec()))
+                    .collect(),
+            ),
+            EngineRes::UIntRes(i) => RedisValue::Int(i as i64),
+            EngineRes::Error(e) => RedisValue::Error(e.to_vec()),
+            // EngineRes::FutureRes(s, _) => RedisValue::from(*s),
+            // EngineRes::FutureResValue(_) => unreachable!(),
+        }
+    }
+}

@@ -1,6 +1,7 @@
 // use rand::Rng;
 use crate::ops::Ops;
-use crate::types::{Engine, EngineRes, Key, Value};
+use crate::types::{Database, Engine, EngineRes, Key, Value};
+use bincode::{deserialize, serialize, Result as BinCodeResult};
 use std::collections::{HashSet, VecDeque};
 use std::fmt;
 
@@ -13,6 +14,7 @@ impl fmt::Display for EngineRes {
             EngineRes::MultiStringRes(ss) => write!(f, "{:?}", ss),
             EngineRes::Nil => write!(f, "(nil)"),
             EngineRes::Error(e) => write!(f, "ERR {:?}", e),
+            // TODO: Figure out how make futures work
             // EngineRes::FutureRes(v, _) => (*v).fmt(f),
             // EngineRes::FutureResValue(_) => unreachable!(),
         }
@@ -26,6 +28,14 @@ enum SetOp {
 }
 
 impl Engine {
+    pub fn save_state(&self) -> BinCodeResult<Vec<u8>> {
+        serialize(&Database {
+            kv: serialize(&*self.kv.read().unwrap()).unwrap(),
+            sets: serialize(&*self.sets.read().unwrap()).unwrap(),
+            lists: serialize(&*self.lists.read().unwrap()).unwrap(),
+        })
+    }
+
     fn many_set_op(&self, keys: Vec<Key>, op: SetOp) -> Option<HashSet<Value>> {
         let engine_sets = self.sets.read().unwrap();
         let sets: Vec<HashSet<Key>> = keys
@@ -36,7 +46,6 @@ impl Engine {
         if sets.is_empty() {
             return None;
         }
-        // TODO: Figure this mess of cloning
         let mut head: HashSet<Key> = (*sets.first().unwrap()).to_owned();
         for set in sets.iter().skip(1).cloned() {
             head = match op {
@@ -68,7 +77,6 @@ impl Engine {
 
     pub fn exec(self, action: Ops) -> EngineRes {
         match action {
-            // Ops::Keys(key_op) => key_op.exec(self),
             Ops::Get(key) => self
                 .kv
                 .read()

@@ -1,7 +1,8 @@
-use crate::types::RedisValue;
 use std::convert::TryFrom;
 
-use crate::types::{Count, Index, Key, Value};
+use crate::types::{
+    Count, Index, Key, RedisValue, Value, EMPTY_ARRAY, NULL_ARRAY, NULL_BULK_STRING,
+};
 
 #[derive(Debug, Clone)]
 pub enum Ops {
@@ -75,6 +76,35 @@ impl From<OpsError> for RedisValue {
             OpsError::InvalidType => RedisValue::Error(b"Invalid Type!".to_vec()),
             OpsError::SyntaxError => RedisValue::Error(b"Syntax Error!".to_vec()),
             OpsError::Noop => RedisValue::Error(b"".to_vec()),
+        }
+    }
+}
+
+impl ToString for RedisValue {
+    fn to_string(&self) -> String {
+        match self {
+            RedisValue::SimpleString(s) => format!("+{}\r\n", String::from_utf8_lossy(s)),
+            RedisValue::Error(e) => format!("-{}\r\n", String::from_utf8_lossy(e)),
+            RedisValue::BulkString(s) => {
+                format!("${}\r\n{}\r\n", s.len(), String::from_utf8_lossy(s))
+            }
+            RedisValue::Int(i) => format!(":{}\r\n", i.to_string()),
+            RedisValue::Array(a) => {
+                if a.is_empty() {
+                    return EMPTY_ARRAY.to_string();
+                }
+                let contents: String = a
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<String>>()
+                    .join("");
+                if contents.ends_with("\r\n") {
+                    return format!("*{:?}\r\n{}", a.len(), contents);
+                }
+                format!("*{:?}\r\n{:?}\r\n", a.len(), contents)
+            }
+            RedisValue::NullBulkString => NULL_BULK_STRING.to_string(),
+            RedisValue::NullArray => NULL_ARRAY.to_string(),
         }
     }
 }
