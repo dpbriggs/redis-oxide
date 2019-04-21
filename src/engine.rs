@@ -1,20 +1,8 @@
 // use rand::Rng;
 use crate::ops::Ops;
-use crate::types::{EngineRes, Key, Value};
-use std::collections::{HashMap, HashSet, VecDeque};
+use crate::types::{Engine, EngineRes, Key, Value};
+use std::collections::{HashSet, VecDeque};
 use std::fmt;
-use std::sync::{Arc, RwLock};
-
-type KeyString = HashMap<Key, Value>;
-type KeySet = HashMap<Key, HashSet<Value>>;
-type KeyList = HashMap<Key, VecDeque<Value>>;
-
-#[derive(Default, Debug, Clone)]
-pub struct Engine {
-    kv: Arc<RwLock<KeyString>>,
-    sets: Arc<RwLock<KeySet>>,
-    lists: Arc<RwLock<KeyList>>,
-}
 
 impl fmt::Display for EngineRes {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -25,8 +13,8 @@ impl fmt::Display for EngineRes {
             EngineRes::MultiStringRes(ss) => write!(f, "{:?}", ss),
             EngineRes::Nil => write!(f, "(nil)"),
             EngineRes::Error(e) => write!(f, "ERR {:?}", e),
-            EngineRes::FutureRes(v, _) => (*v).fmt(f),
-            EngineRes::FutureResValue(_) => unreachable!(),
+            // EngineRes::FutureRes(v, _) => (*v).fmt(f),
+            // EngineRes::FutureResValue(_) => unreachable!(),
         }
     }
 }
@@ -80,6 +68,7 @@ impl Engine {
 
     pub fn exec(self, action: Ops) -> EngineRes {
         match action {
+            // Ops::Keys(key_op) => key_op.exec(self),
             Ops::Get(key) => self
                 .kv
                 .read()
@@ -98,13 +87,16 @@ impl Engine {
                     .count();
                 EngineRes::UIntRes(deleted)
             }
-            Ops::Rename(key, new_key) => match self.kv.write().unwrap().remove(&key) {
-                Some(value) => {
-                    self.kv.write().unwrap().insert(new_key, value);
-                    EngineRes::Ok
+            Ops::Rename(key, new_key) => {
+                let mut keys = self.kv.write().unwrap();
+                match keys.remove(&key) {
+                    Some(value) => {
+                        keys.insert(new_key, value);
+                        EngineRes::Ok
+                    }
+                    None => EngineRes::Error(b"no such key"),
                 }
-                None => EngineRes::Error(b"no such key"),
-            },
+            }
             Ops::Pong => EngineRes::StringRes(b"PONG".to_vec()),
             Ops::FlushAll => {
                 self.kv.write().unwrap().clear();
@@ -413,6 +405,45 @@ impl Engine {
                         }
                     },
                 }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #[cfg(test)]
+    mod keys {
+        use crate::ops::Ops;
+        use crate::types::{Engine, EngineRes, Value};
+        use proptest::prelude::*;
+        proptest! {
+            #[test]
+            fn test_get(v: Value) {
+                let eng = Engine::default();
+                assert_eq!(EngineRes::Nil, eng.clone().exec(Ops::Get(v.clone())));
+                eng.clone().exec(Ops::Set(v.clone(), v.clone()));
+                assert_eq!(EngineRes::StringRes(v.clone()), eng.exec(Ops::Get(v.clone())));
+            }
+            #[test]
+            fn test_set(l: Value, r: Value) {
+                let eng = Engine::default();
+                eng.clone().exec(Ops::Set(l.clone(), r.clone()));
+                assert_eq!(EngineRes::StringRes(r.clone()), eng.exec(Ops::Get(l.clone())));
+            }
+            #[test]
+            fn test_del(l: Value, unused: Value) {
+                let eng = Engine::default();
+                eng.clone().exec(Ops::Set(l.clone(), l.clone()));
+                assert_eq!(EngineRes::UIntRes(1), eng.clone().exec(Ops::Del(vec![l.clone()])));
+                assert_eq!(EngineRes::UIntRes(0), eng.exec(Ops::Del(vec![unused])));
+            }
+            #[test]
+            fn test_rename(old: Value, v: Value, new: Value) {
+                let eng = Engine::default();
+                eng.clone().exec(Ops::Set(old.clone(), v.clone()));
+                eng.clone().exec(Ops::Rename(old.clone(), new.clone()));
+                assert_eq!(EngineRes::StringRes(v.clone()), eng.clone().exec(Ops::Get(new)))
             }
         }
     }

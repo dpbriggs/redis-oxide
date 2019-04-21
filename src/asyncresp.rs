@@ -239,11 +239,57 @@ impl Encoder for RedisValueCodec {
 mod async_resp_tests {
     use crate::asyncresp::RedisValueCodec;
     use crate::types::{RedisValue, Value};
+    use bytes::BytesMut;
     use futures::{Future, Stream};
     use partial_io::{PartialAsyncRead, PartialOp};
     use pretty_assertions::assert_eq;
+    use proptest::collection::vec;
+    use proptest::prelude::*;
     use std::io::Cursor;
+    use tokio::codec::Encoder;
     use tokio_codec::FramedRead;
+
+    proptest! {
+        #[test]
+        fn proptest_no_crash_utf8(input: String) {
+            let first: usize = input.len() / 2;
+            let second = input.len() - first;
+            let seq = vec![
+                PartialOp::Limited(first),
+                PartialOp::Err(std::io::ErrorKind::WouldBlock),
+                PartialOp::Limited(second),
+            ];
+
+            let ref mut reader = Cursor::new(input);
+
+            let partial_reader = PartialAsyncRead::new(reader, seq);
+
+            let decoder = RedisValueCodec::default();
+
+            // Only care that it doesn't crash.
+            FramedRead::new(partial_reader, decoder).collect().wait().unwrap_or(vec![RedisValue::NullArray]);
+       }
+        #[test]
+        fn proptest_no_crash_non_utf8(input in vec(any::<u8>(), 255)) {
+            let first: usize = input.len() / 2;
+            let second = input.len() - first;
+            let seq = vec![
+                PartialOp::Limited(first),
+                PartialOp::Err(std::io::ErrorKind::WouldBlock),
+                PartialOp::Limited(second),
+            ];
+
+            let ref mut reader = Cursor::new(input);
+
+            let partial_reader = PartialAsyncRead::new(reader, seq);
+
+            let decoder = RedisValueCodec::default();
+
+            // Only care that it doesn't crash.
+            FramedRead::new(partial_reader, decoder).collect().wait().unwrap_or(vec![RedisValue::NullArray]);
+        }
+
+    }
 
     fn generic_test(input: &'static str, output: RedisValue) {
         // TODO: Try to make this occur randomly
@@ -263,9 +309,6 @@ mod async_resp_tests {
         let decoder = RedisValueCodec::default();
 
         let result_read = FramedRead::new(partial_reader, decoder).collect().wait();
-
-        use bytes::BytesMut;
-        use tokio::codec::Encoder;
 
         // TODO: Figure out how to use the FramedWrite stuff to actually
         // test async writing.

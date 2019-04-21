@@ -211,6 +211,7 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
         "set" => {
             let (key, val) = get_key_and_val(array)?;
             Ok(Ops::Set(key, val))
+            // Ok(Ops::Keys(KeyOp::Set(key, val)))
         }
         "get" => {
             verify_size(&tail, 1)?;

@@ -3,10 +3,10 @@ use std::env;
 use std::net::SocketAddr;
 
 use crate::asyncresp::{MyError, RedisValueCodec};
+use crate::logger::LOGGER;
 use crate::{
-    engine::Engine,
     ops::translate,
-    types::{EngineRes, RedisValue},
+    types::{Engine, RedisValue},
 };
 use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::*;
@@ -15,20 +15,22 @@ use tokio_codec::Decoder;
 fn process(socket: TcpStream, engine: Engine) {
     let (tx, rx) = RedisValueCodec::default().framed(socket).split();
     // Map all requests into responses and send them back to the client.
+    info!(LOGGER, "accepting new connection...");
     let task = tx
         .send_all(rx.and_then(move |r: RedisValue| match translate(&r) {
             Ok(op) => {
+                debug!(LOGGER, "running op {:?}", op.clone());
                 let res = engine.clone().exec(op);
-                let ret: EngineRes = if let EngineRes::FutureRes(v, f) = res {
-                    tokio::spawn(f);
-                    *v
-                } else if let EngineRes::FutureResValue(f) = res {
-                    tokio::spawn(f); // TODO: Figure out how to get EngineRes
-                    EngineRes::Ok
-                } else {
-                    res
-                };
-                Ok(RedisValue::from(ret))
+                // let ret: EngineRes = if let EngineRes::FutureRes(v, f) = res {
+                //     tokio::spawn(f);
+                //     *v
+                // } else if let EngineRes::FutureResValue(f) = res {
+                //     tokio::spawn(f); // TODO: Figure out how to get EngineRes
+                //     EngineRes::Ok
+                // } else {
+                //     res
+                // };
+                Ok(RedisValue::from(res))
             }
             Err(e) => Ok(RedisValue::from(e)),
         }))
