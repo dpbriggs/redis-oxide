@@ -39,6 +39,15 @@ pub enum EngineRes {
     // FutureResValue(Box<Future<Item = (), Error = ()> + Send>),
 }
 
+impl EngineRes {
+    pub fn is_error(&self) -> bool {
+        if let EngineRes::Error(_) = *self {
+            return true;
+        }
+        false
+    }
+}
+
 // impl std::fmt::Debug for EngineRes {
 //     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 //         match self {

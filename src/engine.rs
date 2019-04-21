@@ -442,6 +442,7 @@ mod test {
             fn test_rename(old: Value, v: Value, new: Value) {
                 let eng = Engine::default();
                 eng.clone().exec(Ops::Set(old.clone(), v.clone()));
+                assert!(eng.clone().exec(Ops::Rename(new.clone(), old.clone())).is_error());
                 eng.clone().exec(Ops::Rename(old.clone(), new.clone()));
                 assert_eq!(EngineRes::StringRes(v.clone()), eng.clone().exec(Ops::Get(new)))
             }
