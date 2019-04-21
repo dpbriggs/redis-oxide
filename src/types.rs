@@ -28,7 +28,7 @@ pub const NULL_ARRAY: &str = "*-1\r\n";
 pub const EMPTY_ARRAY: &str = "*0\r\n";
 
 #[derive(Debug, PartialEq)]
-pub enum EngineRes {
+pub enum UpdateRes {
     Ok,
     StringRes(Value),
     Error(&'static [u8]),
@@ -36,13 +36,13 @@ pub enum EngineRes {
     UIntRes(usize),
     Nil,
     // TODO: Figure out how to get the futures working properly.
-    // FutureRes(Box<EngineRes>, Box<Future<Item = (), Error = ()> + Send>),
+    // FutureRes(Box<UpdateRes>, Box<Future<Item = (), Error = ()> + Send>),
     // FutureResValue(Box<Future<Item = (), Error = ()> + Send>),
 }
 
-impl EngineRes {
+impl UpdateRes {
     pub fn is_error(&self) -> bool {
-        if let EngineRes::Error(_) = *self {
+        if let UpdateRes::Error(_) = *self {
             return true;
         }
         false
@@ -54,7 +54,7 @@ type KeySet = HashMap<Key, HashSet<Value>>;
 type KeyList = HashMap<Key, VecDeque<Value>>;
 
 #[derive(Default, Debug, Clone)]
-pub struct Engine {
+pub struct State {
     pub kv: Arc<RwLock<KeyString>>,
     pub sets: Arc<RwLock<KeySet>>,
     pub lists: Arc<RwLock<KeyList>>,
@@ -67,21 +67,25 @@ pub struct Database {
     pub lists: Vec<u8>,
 }
 
-impl From<EngineRes> for RedisValue {
-    fn from(engine_res: EngineRes) -> Self {
+impl From<UpdateRes> for RedisValue {
+    fn from(engine_res: UpdateRes) -> Self {
         match engine_res {
-            EngineRes::Ok => RedisValue::SimpleString(vec![b'O', b'K']),
-            EngineRes::Nil => RedisValue::NullBulkString,
-            EngineRes::StringRes(s) => RedisValue::BulkString(s),
-            EngineRes::MultiStringRes(a) => RedisValue::Array(
+            UpdateRes::Ok => RedisValue::SimpleString(vec![b'O', b'K']),
+            UpdateRes::Nil => RedisValue::NullBulkString,
+            UpdateRes::StringRes(s) => RedisValue::BulkString(s),
+            UpdateRes::MultiStringRes(a) => RedisValue::Array(
                 a.iter()
                     .map(|s| RedisValue::BulkString(s.to_vec()))
                     .collect(),
             ),
-            EngineRes::UIntRes(i) => RedisValue::Int(i as i64),
-            EngineRes::Error(e) => RedisValue::Error(e.to_vec()),
-            // EngineRes::FutureRes(s, _) => RedisValue::from(*s),
-            // EngineRes::FutureResValue(_) => unreachable!(),
+            UpdateRes::UIntRes(i) => RedisValue::Int(i as i64),
+            UpdateRes::Error(e) => RedisValue::Error(e.to_vec()),
+            // UpdateRes::FutureRes(s, _) => RedisValue::from(*s),
+            // UpdateRes::FutureResValue(_) => unreachable!(),
         }
     }
+}
+
+pub trait UpdateState {
+    fn update(self, engine: State) -> UpdateRes;
 }

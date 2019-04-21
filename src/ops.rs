@@ -1,5 +1,10 @@
 use std::convert::TryFrom;
 
+use crate::keys::KeyOps;
+use crate::lists::ListOps;
+use crate::misc::MiscOps;
+use crate::sets::SetOps;
+
 use crate::types::{
     Count, Index, Key, RedisValue, Value, EMPTY_ARRAY, NULL_ARRAY, NULL_BULK_STRING,
 };
@@ -7,43 +12,47 @@ use crate::types::{
 #[derive(Debug, Clone)]
 pub enum Ops {
     // Key Value
-    Set(Key, Value),
-    Get(Key),
-    Del(Vec<Key>),
-    Rename(Key, Key),
+    Keys(KeyOps),
+    // Set(Key, Value),
+    // Get(Key),
+    // Del(Vec<Key>),
+    // Rename(Key, Key),
     // Sets
-    SAdd(Key, Vec<Value>),
-    SCard(Key),
-    SDiff(Vec<Value>),
-    SDiffStore(Key, Vec<Value>),
-    SInter(Vec<Value>),
-    SInterStore(Key, Vec<Value>),
-    SIsMember(Key, Value),
-    SMembers(Key),
-    SMove(Key, Key, Value),
-    SPop(Key, Option<Count>),
-    SRandMembers(Key, Option<Count>),
-    SRem(Key, Vec<Value>),
-    SUnion(Vec<Value>),
-    SUnionStore(Key, Vec<Value>),
+    Sets(SetOps),
+    // SAdd(Key, Vec<Value>),
+    // SCard(Key),
+    // SDiff(Vec<Value>),
+    // SDiffStore(Key, Vec<Value>),
+    // SInter(Vec<Value>),
+    // SInterStore(Key, Vec<Value>),
+    // SIsMember(Key, Value),
+    // SMembers(Key),
+    // SMove(Key, Key, Value),
+    // SPop(Key, Option<Count>),
+    // SRandMembers(Key, Option<Count>),
+    // SRem(Key, Vec<Value>),
+    // SUnion(Vec<Value>),
+    // SUnionStore(Key, Vec<Value>),
     // Lists
-    LIndex(Key, Index),
-    LLen(Key),
-    LPop(Key),
-    LPush(Key, Vec<Value>),
-    LPushX(Key, Value),
-    LRange(Key, Index, Index),
-    LSet(Key, Index, Value),
-    LTrim(Key, Index, Index),
-    RPop(Key),
-    RPush(Key, Vec<Value>),
-    RPushX(Key, Value),
-    RPopLPush(Key, Key),
+    Lists(ListOps),
+    // LIndex(Key, Index),
+    // LLen(Key),
+    // LPop(Key),
+    // LPush(Key, Vec<Value>),
+    // LPushX(Key, Value),
+    // LRange(Key, Index, Index),
+    // LSet(Key, Index, Value),
+    // LTrim(Key, Index, Index),
+    // RPop(Key),
+    // RPush(Key, Vec<Value>),
+    // RPushX(Key, Value),
+    // RPopLPush(Key, Key),
     // Misc
-    Keys, // TODO: Add optional glob
-    Exists(Vec<Key>),
-    Pong,
-    FlushAll,
+    Misc(MiscOps),
+    // DBKeys, // TODO: Add optional glob
+    // Exists(Vec<Key>),
+    // Pong,
+    // FlushAll,
 }
 
 #[derive(Debug)]
@@ -170,9 +179,9 @@ impl TryFrom<&RedisValue> for Count {
 fn translate_string(start: &[u8]) -> Result<Ops, OpsError> {
     let start = &String::from_utf8_lossy(start);
     match start.to_lowercase().as_ref() {
-        "ping" => Ok(Ops::Pong),
-        "keys" => Ok(Ops::Keys),
-        "flushall" => Ok(Ops::FlushAll),
+        "ping" => Ok(Ops::Misc(MiscOps::Pong)),
+        "keys" => Ok(Ops::Misc(MiscOps::Keys)),
+        "flushall" => Ok(Ops::Misc(MiscOps::FlushAll)),
         _ => Err(OpsError::UnknownOp),
     }
 }
@@ -240,75 +249,75 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
         // Key-Value
         "set" => {
             let (key, val) = get_key_and_val(array)?;
-            Ok(Ops::Set(key, val))
+            Ok(Ops::Keys(KeyOps::Set(key, val)))
             // Ok(Ops::Keys(KeyOp::Set(key, val)))
         }
         "get" => {
             verify_size(&tail, 1)?;
             let key = Key::try_from(tail[0])?;
-            Ok(Ops::Get(key))
+            Ok(Ops::Keys(KeyOps::Get(key)))
         }
         "del" => {
             verify_size_lower(&tail, 1)?;
             let keys = tails_as_strings(&tail)?;
-            Ok(Ops::Del(keys))
+            Ok(Ops::Keys(KeyOps::Del(keys)))
         }
         "rename" => {
             verify_size(&tail, 2)?;
             let key = Key::try_from(tail[0])?;
             let new_key = Key::try_from(tail[1])?;
-            Ok(Ops::Rename(key, new_key))
+            Ok(Ops::Keys(KeyOps::Rename(key, new_key)))
         }
         "exists" => {
             verify_size_lower(&tail, 1)?;
             let keys = tails_as_strings(&tail)?;
-            Ok(Ops::Exists(keys))
+            Ok(Ops::Misc(MiscOps::Exists(keys)))
         }
         // Sets
         "sadd" => {
             let (set_key, vals) = get_key_and_tail(array)?;
-            Ok(Ops::SAdd(set_key, vals))
+            Ok(Ops::Sets(SetOps::SAdd(set_key, vals)))
         }
         "srem" => {
             let (set_key, vals) = get_key_and_tail(array)?;
-            Ok(Ops::SRem(set_key, vals))
+            Ok(Ops::Sets(SetOps::SRem(set_key, vals)))
         }
         "smembers" => {
             verify_size(&tail, 1)?;
             let set_key = Key::try_from(tail[0])?;
-            Ok(Ops::SMembers(set_key))
+            Ok(Ops::Sets(SetOps::SMembers(set_key)))
         }
         "scard" => {
             verify_size(&tail, 1)?;
             let key = Key::try_from(tail[0])?;
-            Ok(Ops::SCard(key))
+            Ok(Ops::Sets(SetOps::SCard(key)))
         }
         "sdiff" => {
             verify_size_lower(&tail, 2)?;
             let keys = tails_as_strings(&tail)?;
-            Ok(Ops::SDiff(keys))
+            Ok(Ops::Sets(SetOps::SDiff(keys)))
         }
         "sunion" => {
             verify_size_lower(&tail, 2)?;
             let keys = tails_as_strings(&tail)?;
-            Ok(Ops::SUnion(keys))
+            Ok(Ops::Sets(SetOps::SUnion(keys)))
         }
         "sinter" => {
             verify_size_lower(&tail, 2)?;
             let keys = tails_as_strings(&tail)?;
-            Ok(Ops::SInter(keys))
+            Ok(Ops::Sets(SetOps::SInter(keys)))
         }
         "sdiffstore" => {
             let (set_key, sets) = get_key_and_tail(array)?;
-            Ok(Ops::SDiffStore(set_key, sets))
+            Ok(Ops::Sets(SetOps::SDiffStore(set_key, sets)))
         }
         "sunionstore" => {
             let (set_key, sets) = get_key_and_tail(array)?;
-            Ok(Ops::SUnionStore(set_key, sets))
+            Ok(Ops::Sets(SetOps::SUnionStore(set_key, sets)))
         }
         "sinterstore" => {
             let (set_key, sets) = get_key_and_tail(array)?;
-            Ok(Ops::SInterStore(set_key, sets))
+            Ok(Ops::Sets(SetOps::SInterStore(set_key, sets)))
         }
         "spop" => {
             verify_size_lower(&tail, 1)?;
@@ -317,18 +326,18 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
                 Some(c) => Some(Count::try_from(*c)?),
                 None => None,
             };
-            Ok(Ops::SPop(key, count))
+            Ok(Ops::Sets(SetOps::SPop(key, count)))
         }
         "sismember" => {
             let (key, member) = get_key_and_val(array)?;
-            Ok(Ops::SIsMember(key, member))
+            Ok(Ops::Sets(SetOps::SIsMember(key, member)))
         }
         "smove" => {
             verify_size(&tail, 3)?;
             let src = Key::try_from(tail[0])?;
             let dest = Key::try_from(tail[1])?;
             let member = Value::try_from(tail[2])?;
-            Ok(Ops::SMove(src, dest, member))
+            Ok(Ops::Sets(SetOps::SMove(src, dest, member)))
         }
         "srandmember" => {
             verify_size_lower(&tail, 1)?;
@@ -337,80 +346,80 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
                 Some(c) => Some(Count::try_from(*c)?),
                 None => None,
             };
-            Ok(Ops::SRandMembers(key, count))
+            Ok(Ops::Sets(SetOps::SRandMembers(key, count)))
         }
         "lpush" => {
             let (key, vals) = get_key_and_tail(array)?;
-            Ok(Ops::LPush(key, vals))
+            Ok(Ops::Lists(ListOps::LPush(key, vals)))
         }
         "rpush" => {
             let (key, vals) = get_key_and_tail(array)?;
-            Ok(Ops::RPush(key, vals))
+            Ok(Ops::Lists(ListOps::RPush(key, vals)))
         }
         "lpushx" => {
             verify_size(&tail, 2)?;
             let key = Key::try_from(tail[0])?;
             let val = Value::try_from(tail[1])?;
-            Ok(Ops::LPushX(key, val))
+            Ok(Ops::Lists(ListOps::LPushX(key, val)))
         }
         "rpushx" => {
             verify_size(&tail, 2)?;
             let key = Key::try_from(tail[0])?;
             let val = Value::try_from(tail[1])?;
-            Ok(Ops::RPushX(key, val))
+            Ok(Ops::Lists(ListOps::RPushX(key, val)))
         }
         "llen" => {
             verify_size(&tail, 1)?;
             let key = Key::try_from(tail[0])?;
-            Ok(Ops::LLen(key))
+            Ok(Ops::Lists(ListOps::LLen(key)))
         }
         "lpop" => {
             verify_size(&tail, 1)?;
             let key = Key::try_from(tail[0])?;
-            Ok(Ops::LPop(key))
+            Ok(Ops::Lists(ListOps::LPop(key)))
         }
         "rpop" => {
             verify_size(&tail, 1)?;
             let key = Key::try_from(tail[0])?;
-            Ok(Ops::RPop(key))
+            Ok(Ops::Lists(ListOps::RPop(key)))
         }
         "linsert" => {
             verify_size(&tail, 1)?;
             let key = Key::try_from(tail[0])?;
-            Ok(Ops::LPop(key))
+            Ok(Ops::Lists(ListOps::LPop(key)))
         }
         "lindex" => {
             verify_size(&tail, 2)?;
             let key = Key::try_from(tail[0])?;
             let index = Index::try_from(tail[1])?;
-            Ok(Ops::LIndex(key, index))
+            Ok(Ops::Lists(ListOps::LIndex(key, index)))
         }
         "lset" => {
             verify_size(&tail, 3)?;
             let key = Key::try_from(tail[0])?;
             let index = Index::try_from(tail[1])?;
             let value = Value::try_from(tail[2])?;
-            Ok(Ops::LSet(key, index, value))
+            Ok(Ops::Lists(ListOps::LSet(key, index, value)))
         }
         "lrange" => {
             verify_size(&tail, 3)?;
             let key = Key::try_from(tail[0])?;
             let start_index = Index::try_from(tail[1])?;
             let end_index = Index::try_from(tail[2])?;
-            Ok(Ops::LRange(key, start_index, end_index))
+            Ok(Ops::Lists(ListOps::LRange(key, start_index, end_index)))
         }
         "ltrim" => {
             verify_size(&tail, 3)?;
             let key = Key::try_from(tail[0])?;
             let start_index = Index::try_from(tail[1])?;
             let end_index = Index::try_from(tail[2])?;
-            Ok(Ops::LTrim(key, start_index, end_index))
+            Ok(Ops::Lists(ListOps::LTrim(key, start_index, end_index)))
         }
         "rpoplpush" => {
             verify_size(&tail, 2)?;
             let source = Key::try_from(tail[0])?;
             let dest = Key::try_from(tail[1])?;
-            Ok(Ops::RPopLPush(source, dest))
+            Ok(Ops::Lists(ListOps::RPopLPush(source, dest)))
         }
 
         _ => Err(OpsError::UnknownOp),

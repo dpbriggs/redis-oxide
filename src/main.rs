@@ -5,7 +5,6 @@ extern crate pretty_assertions;
 extern crate promptly;
 extern crate shlex;
 
-#[macro_use]
 extern crate structopt;
 
 #[macro_use]
@@ -24,24 +23,28 @@ extern crate combine;
 use structopt::StructOpt;
 
 mod asyncresp;
-mod engine;
+mod keys;
+mod lists;
 mod logger;
+mod misc;
 mod ops;
 mod server;
+mod sets;
 mod startup;
+mod state;
 mod types;
 
 use self::logger::LOGGER;
 use self::server::server;
 use self::startup::{startup_message, Config};
-use self::types::Engine;
+use self::types::State;
 
 fn main() {
     let opt = Config::from_args();
     println!("{:?}", opt);
     startup_message(&opt);
     info!(LOGGER, "initializing engine...");
-    let engine = Engine::default();
+    let engine = State::default();
     info!(LOGGER, "starting server...");
     server(engine).expect("server failed to start!");
 }
