@@ -28,7 +28,7 @@ pub const NULL_ARRAY: &str = "*-1\r\n";
 pub const EMPTY_ARRAY: &str = "*0\r\n";
 
 #[derive(Debug, PartialEq)]
-pub enum UpdateRes {
+pub enum InteractionRes {
     Ok,
     StringRes(Value),
     Error(&'static [u8]),
@@ -36,13 +36,13 @@ pub enum UpdateRes {
     UIntRes(usize),
     Nil,
     // TODO: Figure out how to get the futures working properly.
-    // FutureRes(Box<UpdateRes>, Box<Future<Item = (), Error = ()> + Send>),
+    // FutureRes(Box<InteractionRes>, Box<Future<Item = (), Error = ()> + Send>),
     // FutureResValue(Box<Future<Item = (), Error = ()> + Send>),
 }
 
-impl UpdateRes {
+impl InteractionRes {
     pub fn is_error(&self) -> bool {
-        if let UpdateRes::Error(_) = *self {
+        if let InteractionRes::Error(_) = *self {
             return true;
         }
         false
@@ -67,25 +67,25 @@ pub struct Database {
     pub lists: Vec<u8>,
 }
 
-impl From<UpdateRes> for RedisValue {
-    fn from(engine_res: UpdateRes) -> Self {
+impl From<InteractionRes> for RedisValue {
+    fn from(engine_res: InteractionRes) -> Self {
         match engine_res {
-            UpdateRes::Ok => RedisValue::SimpleString(vec![b'O', b'K']),
-            UpdateRes::Nil => RedisValue::NullBulkString,
-            UpdateRes::StringRes(s) => RedisValue::BulkString(s),
-            UpdateRes::MultiStringRes(a) => RedisValue::Array(
+            InteractionRes::Ok => RedisValue::SimpleString(vec![b'O', b'K']),
+            InteractionRes::Nil => RedisValue::NullBulkString,
+            InteractionRes::StringRes(s) => RedisValue::BulkString(s),
+            InteractionRes::MultiStringRes(a) => RedisValue::Array(
                 a.iter()
                     .map(|s| RedisValue::BulkString(s.to_vec()))
                     .collect(),
             ),
-            UpdateRes::UIntRes(i) => RedisValue::Int(i as i64),
-            UpdateRes::Error(e) => RedisValue::Error(e.to_vec()),
-            // UpdateRes::FutureRes(s, _) => RedisValue::from(*s),
-            // UpdateRes::FutureResValue(_) => unreachable!(),
+            InteractionRes::UIntRes(i) => RedisValue::Int(i as i64),
+            InteractionRes::Error(e) => RedisValue::Error(e.to_vec()),
+            // InteractionRes::FutureRes(s, _) => RedisValue::from(*s),
+            // InteractionRes::FutureResValue(_) => unreachable!(),
         }
     }
 }
 
-pub trait UpdateState {
-    fn update(self, engine: State) -> UpdateRes;
+pub trait StateInteration {
+    fn interact(self, engine: State) -> InteractionRes;
 }

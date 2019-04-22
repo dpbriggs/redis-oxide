@@ -1,4 +1,4 @@
-use crate::types::{Key, State, UpdateRes, UpdateState};
+use crate::types::{InteractionRes, Key, State, StateInteration};
 
 #[derive(Debug, Clone)]
 pub enum MiscOps {
@@ -8,18 +8,18 @@ pub enum MiscOps {
     FlushAll,
 }
 
-impl UpdateState for MiscOps {
-    fn update(self, engine: State) -> UpdateRes {
+impl StateInteration for MiscOps {
+    fn interact(self, engine: State) -> InteractionRes {
         // match self {}
         match self {
-            MiscOps::Pong => UpdateRes::StringRes(b"PONG".to_vec()),
+            MiscOps::Pong => InteractionRes::StringRes(b"PONG".to_vec()),
             MiscOps::FlushAll => {
                 engine.kv.write().unwrap().clear();
                 engine.sets.write().unwrap().clear();
                 engine.lists.write().unwrap().clear();
-                UpdateRes::Ok
+                InteractionRes::Ok
             }
-            MiscOps::Exists(keys) => UpdateRes::UIntRes(
+            MiscOps::Exists(keys) => InteractionRes::UIntRes(
                 keys.iter()
                     .map(|key| engine.kv.read().unwrap().contains_key(key))
                     .filter(|exists| *exists)
@@ -32,7 +32,7 @@ impl UpdateState for MiscOps {
                     engine.lists.read().unwrap().keys().cloned().collect();
                 kv_keys.append(&mut set_keys);
                 kv_keys.append(&mut list_keys);
-                UpdateRes::MultiStringRes(kv_keys)
+                InteractionRes::MultiStringRes(kv_keys)
             }
         }
     }

@@ -41,10 +41,9 @@ use self::types::State;
 
 fn main() {
     let opt = Config::from_args();
-    println!("{:?}", opt);
     startup_message(&opt);
-    info!(LOGGER, "initializing engine...");
+    info!(LOGGER, "Initializing State...");
     let engine = State::default();
-    info!(LOGGER, "starting server...");
+    info!(LOGGER, "Starting Server...");
     server(engine).expect("server failed to start!");
 }

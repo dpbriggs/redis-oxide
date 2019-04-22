@@ -1,23 +1,23 @@
 // use rand::Rng;
 use crate::ops::Ops;
-use crate::types::UpdateState;
-use crate::types::{Database, State, UpdateRes};
+use crate::types::StateInteration;
+use crate::types::{Database, InteractionRes, State};
 use bincode::{serialize, Result as BinCodeResult};
 use std::collections::{HashSet, VecDeque};
 use std::fmt;
 
-impl fmt::Display for UpdateRes {
+impl fmt::Display for InteractionRes {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            UpdateRes::Ok => write!(f, "OK"),
-            UpdateRes::StringRes(s) => write!(f, "{:?}", s),
-            UpdateRes::UIntRes(i) => write!(f, "{:?}", i),
-            UpdateRes::MultiStringRes(ss) => write!(f, "{:?}", ss),
-            UpdateRes::Nil => write!(f, "(nil)"),
-            UpdateRes::Error(e) => write!(f, "ERR {:?}", e),
+            InteractionRes::Ok => write!(f, "OK"),
+            InteractionRes::StringRes(s) => write!(f, "{:?}", s),
+            InteractionRes::UIntRes(i) => write!(f, "{:?}", i),
+            InteractionRes::MultiStringRes(ss) => write!(f, "{:?}", ss),
+            InteractionRes::Nil => write!(f, "(nil)"),
+            InteractionRes::Error(e) => write!(f, "ERR {:?}", e),
             // TODO: Figure out how make futures work
-            // UpdateRes::FutureRes(v, _) => (*v).fmt(f),
-            // UpdateRes::FutureResValue(_) => unreachable!(),
+            // InteractionRes::FutureRes(v, _) => (*v).fmt(f),
+            // InteractionRes::FutureResValue(_) => unreachable!(),
         }
     }
 }
@@ -49,12 +49,12 @@ impl State {
         }
     }
 
-    pub fn update_state(self, action: Ops) -> UpdateRes {
+    pub fn interact(self, action: Ops) -> InteractionRes {
         match action {
-            Ops::Keys(key_op) => key_op.update(self),
-            Ops::Lists(list_op) => list_op.update(self),
-            Ops::Misc(misc_op) => misc_op.update(self),
-            Ops::Sets(set_op) => set_op.update(self),
+            Ops::Keys(key_op) => key_op.interact(self),
+            Ops::Lists(list_op) => list_op.interact(self),
+            Ops::Misc(misc_op) => misc_op.interact(self),
+            Ops::Sets(set_op) => set_op.interact(self),
         }
     }
 }

@@ -22,7 +22,7 @@ fn process(socket: TcpStream, engine: State) {
         .send_all(rx.and_then(move |r: RedisValue| match translate(&r) {
             Ok(op) => {
                 debug!(LOGGER, "running op {:?}", op.clone());
-                let res = engine.clone().update_state(op);
+                let res = engine.clone().interact(op);
                 Ok(RedisValue::from(res))
             }
             Err(e) => Ok(RedisValue::from(e)),

@@ -1,31 +1,151 @@
-#+TITLE: Redis-Oxide
-#+SUBTITLE: rusty-redis clone
 #+AUTHOR: David Briggs
 
 * Redis Oxide
 
-[[https://travis-ci.org/dpbriggs/redis-oxide.svg?branch=master][https://travis-ci.org/dpbriggs/redis-oxide.svg?branch=master]]
+[[https://travis-ci.org/dpbriggs/redis-oxide][https://travis-ci.org/dpbriggs/redis-oxide.svg?branch=master]]
 
 This project is intended to be a more-or-less drop in replacement for redis.
 It's under construction at the moment.
 
-#+begin_example
-> : sadd myset foo bar baz
-UIntRes(3)
-> : sadd second-set hello world bar
-UIntRes(3)
-> : sunion myset second-set
-MultiStringRes(["baz", "world", "bar", "foo", "hello"])
-> : sinter myset second-set
-MultiStringRes(["bar"])
-#+end_example
+#+begin_src bash
+Apr 21 20:34:08.029 INFO 
+____/\\\\\\\\\_____   _______/\\\\\______   ____________________
+ __/\\\///////\\\___   _____/\\\///\\\____   ____________________
+  _\/\\\_____\/\\\___   ___/\\\/__\///\\\__   ____________________
+   _\/\\\\\\\\\\\/____   __/\\\______\//\\\_   ____/\\\\\\\\\______
+    _\/\\\//////\\\____   _\/\\\_______\/\\\_   __/\\\/__////\______
+     _\/\\\____\//\\\___   _\//\\\______/\\\__   _______///\/________
+      _\/\\\_____\//\\\__   __\///\\\__/\\\____   _____/\\\/__________
+       _\/\\\______\//\\\_   ____\///\\\\\/_____   ___/\\\/____________
+        _\///________\///__   ______\/////_______   __\/////////________
+
+Apr 21 20:34:08.029 INFO Redis Oxide starting...
+Apr 21 20:34:08.029 INFO Initializing State...
+Apr 21 20:34:08.029 INFO Starting Server...
+Apr 21 20:34:08.030 INFO Listening on: 127.0.0.1:6379
+#+end_src
+
+** Design
+
+=redis-oxide= is a black-box multi-threaded re-implementation of redis, backed by [[https://tokio.rs/][tokio]].
+It features data-structure key-space/lock granularity, written entirely in safe rust.
+It's currently protocol compatible with redis, so you should be able to test it out with your favourite tools.
+
+The multi-threaded nature has advantages and disadvantages.
+On one hand, =KEYS *= isn't particularly crippling for the server as it'll just keep a thread busy.
+On the other hand, there's some lock-juggling overhead, especially for writes, which messes with tokio.
 
 ** Building / Running
 
-This project requires the rust nightly. You can use [[https://rustup.rs/][rustup]] to install it.
-Then, it's just the same as other rust projects:
+There's currently no official release for the project. You can compile and install it yourself with the following command:
+
+: cargo install --git https://github.com/dpbriggs/redis-oxide
+
+Note: This project requires the rust nightly. You can use [[https://rustup.rs/][rustup]] to install it.
+
+Once it compiles you should be able to run it with =~ redis-oxide=.
+
+If you wish to download and run it yourself, you can do the following
 
 #+begin_example
+~ git clone https://github.com/dpbriggs/redis-oxide
 ~ cd redis-oxide
 ~ cargo run
 #+end_example
+
+Then use your favorite redis client. Eg. =redis-cli=:
+
+#+begin_example
+~ redis-cli
+127.0.0.1:6379> set foo bar
+OK
+127.0.0.1:6379> get foo
+"bar"
+#+end_example
+
+Or using the redis library for python:
+
+#+begin_src python
+import redis
+from pprint import pprint
+
+r = redis.Redis()
+r.set('foobar', 'foobar')
+pprint(r.get('foobar'))
+
+for i in range(100):
+    r.rpush('list', i)
+
+list_res = r.lrange('list', 0, -1)
+
+pprint(list_res[0:3])
+pprint(sum(map(lambda x: int(x), list_res)))
+#+end_src
+
+Which will print:
+
+#+begin_example
+b'foobar'
+[b'0', b'1', b'2']
+19800
+#+end_example
+
+** Things left to do
+
+*** Basic Datastructures
+
+- [X] Keys
+- [X] Sets
+- [X] Lists
+- [ ] Hashes
+- [ ] HyperLogLog
+- [ ] Geo
+- [ ] Sorted Sets
+- [ ] Strings
+
+We should solidify the above before working on the more complex bits, but contributions are welcome :)
+
+*** Redis Compatibility
+
+- [X] Resp / server
+- [ ] Database compatibility
+  - [ ] Unsure if this is a good thing -- may be better to port existing dumps.
+- [ ] Blocking / Concurrent Ops (ttl/save-on-x-ops)
+- [ ] CLI / config compatibility
+- [ ] Authentication
+
+** Contribution Guide
+
+Conduct: =Have fun, please don't be a jerk.=
+
+Contact: Make an issue or PR against this repo, or send an email to =email@dpbriggs.ca=. If you know of a better forum, please suggest it!
+
+NOTE: *DO NOT USE THE REDIS SOURCE CODE IN ANY WAY!*
+
+This project is under active development, so things are a little messy.
+
+The general design of =redis-oxide= is:
+
+- A Command (=set foo bar=) is read off the socket and passed to the translate function in =src/ops.rs=.
+  - The parser generates a =RedisValue=, which is the lingua franca of =redis-oxide=.
+- This gets converted to an =Ops::XYZ(XYZOps::Foobar(..))= enum object, which implements the =StateInteration= trait.
+  - This nested enum is a dirty way to get static dispatch and hacky-polymorphism. If you can find a nice generic way to represent this, please let me know!
+- This operation is executed against the global =State= object (using the =StateInteraction= trait).
+  - This will return an =InteractionRes= type, which is a more convenient form of =RedisValue=.
+  - This =InteractionRes= is converted and sent back to the client.
+
+Therefore, if you want to do something like implement =hashes=, you will need to:
+
+1. Add a new struct member in =State=.
+   1. This would look like like =hashes: Arc<RwLock<KeyHashes>>=, where =type KeyHashes = HashMap<Key, HashMap<Key,Value>>=.
+2. Define a new file for your data type, =src/hashes.rs=.
+   1. Keep your type definitions in =src/types.rs=!
+3. Create an enum to track your commands, =pub enum HashOps { HSet(Key, Key, Value) }=
+4. Implement parsing for your enum in =src/ops.rs=.
+   1. You should be able to follow the existing parsing infrastructure. Should just be extra entries in =translate_array= in =src/ops.rs=.
+   2. You should return something like =Ok(Ops::Hash(HashOps::HSet(x, y, z)))=.
+   3. A stretch goal is to automate parsing.
+5. Implement =StateInteration= for your type; I would follow existing implementations (eg. =src/keys.rs=).
+   1. I would keep the redis docs open, and play around with the commands in the web console (or wherever) to determine behavior.
+   2. Add a new match entry in the =State::interact= method in =src/state.rs=.
+6. Test it! (follow existing testing bits; eg. =src/keys.rs=).
