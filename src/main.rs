@@ -23,6 +23,7 @@ extern crate combine;
 use structopt::StructOpt;
 
 mod asyncresp;
+mod hashes;
 mod keys;
 mod lists;
 mod logger;
@@ -43,7 +44,7 @@ fn main() {
     let opt = Config::from_args();
     startup_message(&opt);
     info!(LOGGER, "Initializing State...");
-    let engine = State::default();
+    let state = State::default();
     info!(LOGGER, "Starting Server...");
-    server(engine).expect("server failed to start!");
+    server(state).expect("server failed to start!");
 }

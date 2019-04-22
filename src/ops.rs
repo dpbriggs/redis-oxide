@@ -1,5 +1,6 @@
 use std::convert::TryFrom;
 
+use crate::hashes::HashOps;
 use crate::keys::KeyOps;
 use crate::lists::ListOps;
 use crate::misc::MiscOps;
@@ -11,48 +12,11 @@ use crate::types::{
 
 #[derive(Debug, Clone)]
 pub enum Ops {
-    // Key Value
     Keys(KeyOps),
-    // Set(Key, Value),
-    // Get(Key),
-    // Del(Vec<Key>),
-    // Rename(Key, Key),
-    // Sets
     Sets(SetOps),
-    // SAdd(Key, Vec<Value>),
-    // SCard(Key),
-    // SDiff(Vec<Value>),
-    // SDiffStore(Key, Vec<Value>),
-    // SInter(Vec<Value>),
-    // SInterStore(Key, Vec<Value>),
-    // SIsMember(Key, Value),
-    // SMembers(Key),
-    // SMove(Key, Key, Value),
-    // SPop(Key, Option<Count>),
-    // SRandMembers(Key, Option<Count>),
-    // SRem(Key, Vec<Value>),
-    // SUnion(Vec<Value>),
-    // SUnionStore(Key, Vec<Value>),
-    // Lists
     Lists(ListOps),
-    // LIndex(Key, Index),
-    // LLen(Key),
-    // LPop(Key),
-    // LPush(Key, Vec<Value>),
-    // LPushX(Key, Value),
-    // LRange(Key, Index, Index),
-    // LSet(Key, Index, Value),
-    // LTrim(Key, Index, Index),
-    // RPop(Key),
-    // RPush(Key, Vec<Value>),
-    // RPushX(Key, Value),
-    // RPopLPush(Key, Key),
-    // Misc
     Misc(MiscOps),
-    // DBKeys, // TODO: Add optional glob
-    // Exists(Vec<Key>),
-    // Pong,
-    // FlushAll,
+    Hashes(HashOps),
 }
 
 #[derive(Debug)]
@@ -60,7 +24,7 @@ pub enum OpsError {
     InvalidStart,
     Noop,
     UnknownOp,
-    NotEnoughArgs(usize),
+    NotEnoughArgs(usize, usize), // req, given
     WrongNumberOfArgs(usize, usize),
     InvalidType,
     SyntaxError,
@@ -71,8 +35,8 @@ impl From<OpsError> for RedisValue {
         match op {
             OpsError::InvalidStart => RedisValue::Error(b"Invalid start!".to_vec()),
             OpsError::UnknownOp => RedisValue::Error(b"Unknown Operation!".to_vec()),
-            OpsError::NotEnoughArgs(missing) => {
-                let f = format!("Not enough arguments, {} missing!", missing);
+            OpsError::NotEnoughArgs(req, given) => {
+                let f = format!("Not enough arguments, {} required, {} given!", req, given);
                 RedisValue::Error(f.as_bytes().to_vec())
             }
             OpsError::WrongNumberOfArgs(required, given) => {
@@ -204,7 +168,7 @@ fn tails_as_strings(tail: &[&RedisValue]) -> Result<Vec<Value>, OpsError> {
 
 fn verify_size_lower(v: &[&RedisValue], min_size: usize) -> Result<(), OpsError> {
     if v.len() < min_size {
-        return Err(OpsError::NotEnoughArgs(min_size));
+        return Err(OpsError::NotEnoughArgs(min_size, v.len()));
     }
     Ok(())
 }
@@ -420,6 +384,37 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
             let source = Key::try_from(tail[0])?;
             let dest = Key::try_from(tail[1])?;
             Ok(Ops::Lists(ListOps::RPopLPush(source, dest)))
+        }
+        "hget" => {
+            verify_size(&tail, 2)?;
+            let key = Key::try_from(tail[0])?;
+            let field = Key::try_from(tail[1])?;
+            Ok(Ops::Hashes(HashOps::HGet(key, field)))
+        }
+        "hset" => {
+            verify_size(&tail, 3)?;
+            let key = Key::try_from(tail[0])?;
+            let field = Key::try_from(tail[1])?;
+            let value = Key::try_from(tail[2])?;
+            Ok(Ops::Hashes(HashOps::HSet(key, field, value)))
+        }
+        "hexists" => {
+            verify_size(&tail, 2)?;
+            let key = Key::try_from(tail[0])?;
+            let field = Key::try_from(tail[1])?;
+            Ok(Ops::Hashes(HashOps::HExists(key, field)))
+        }
+        "hgetall" => {
+            verify_size(&tail, 1)?;
+            let key = Key::try_from(tail[0])?;
+            Ok(Ops::Hashes(HashOps::HGetAll(key)))
+        }
+        "hmget" => {
+            verify_size_lower(&tail, 2)?;
+            let key = Key::try_from(tail[0])?;
+            let fields = tails_as_strings(&tail[1..])?;
+            println!("{:?}", fields);
+            Ok(Ops::Hashes(HashOps::HMGet(key, fields)))
         }
 
         _ => Err(OpsError::UnknownOp),

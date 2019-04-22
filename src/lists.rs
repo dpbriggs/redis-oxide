@@ -1,4 +1,4 @@
-use crate::types::{Index, InteractionRes, Key, State, StateInteration, Value};
+use crate::types::{Count, Index, InteractionRes, Key, State, StateInteration, Value};
 use std::collections::VecDeque;
 
 #[derive(Debug, Clone)]
@@ -18,72 +18,79 @@ pub enum ListOps {
     RPopLPush(Key, Key),
 }
 
+macro_rules! read_lists {
+    ($state:expr) => {
+        $state.lists.read().unwrap()
+    };
+    ($state: expr, $key: expr) => {
+        $state.lists.read().unwrap().get($key)
+    };
+}
+
+macro_rules! write_lists {
+    ($state:expr) => {
+        $state.lists.write().unwrap()
+    };
+    ($state: expr, $key: expr) => {
+        $state.lists.write().unwrap().get_mut($key)
+    };
+    ($state: expr, $key:expr, $var_name:ident) => {
+        let mut __temp_name = $state.lists.write().unwrap();
+        let $var_name = __temp_name.get_mut($key).unwrap();
+    };
+}
+
 impl StateInteration for ListOps {
-    fn interact(self, engine: State) -> InteractionRes {
+    #[allow(clippy::cognitive_complexity)]
+    fn interact(self, state: State) -> InteractionRes {
         match self {
             ListOps::LPush(key, vals) => {
-                engine.create_list_if_necessary(&key);
-                let mut lists = engine.lists.write().unwrap();
-                let list = lists.get_mut(&key).unwrap();
+                state.create_list_if_necessary(&key);
+                write_lists!(state, &key, list);
                 for val in vals {
                     list.push_front(val)
                 }
-                InteractionRes::UIntRes(list.len())
+                InteractionRes::IntRes(list.len() as Count)
             }
             ListOps::LPushX(key, val) => {
-                if !engine.lists.read().unwrap().contains_key(&key) {
-                    return InteractionRes::UIntRes(0);
+                if !read_lists!(state).contains_key(&key) {
+                    return InteractionRes::IntRes(0);
                 }
-                engine.create_list_if_necessary(&key);
-                let mut lists = engine.lists.write().unwrap();
-                let list = lists.get_mut(&key).unwrap();
+                state.create_list_if_necessary(&key);
+                write_lists!(state, &key, list);
                 list.push_front(val);
-                InteractionRes::UIntRes(list.len())
+                InteractionRes::IntRes(list.len() as Count)
             }
-            ListOps::LLen(key) => match engine.lists.read().unwrap().get(&key) {
-                Some(l) => InteractionRes::UIntRes(l.len()),
-                None => InteractionRes::UIntRes(0),
+            ListOps::LLen(key) => match read_lists!(state, &key) {
+                Some(l) => InteractionRes::IntRes(l.len() as Count),
+                None => InteractionRes::IntRes(0),
             },
-            ListOps::LPop(key) => match engine
-                .lists
-                .write()
-                .unwrap()
-                .get_mut(&key)
-                .and_then(VecDeque::pop_front)
-            {
+            ListOps::LPop(key) => match write_lists!(state, &key).and_then(VecDeque::pop_front) {
                 Some(v) => InteractionRes::StringRes(v),
                 None => InteractionRes::Nil,
             },
-            ListOps::RPop(key) => match engine
-                .lists
-                .write()
-                .unwrap()
-                .get_mut(&key)
-                .and_then(VecDeque::pop_back)
-            {
+            ListOps::RPop(key) => match write_lists!(state, &key).and_then(VecDeque::pop_back) {
                 Some(v) => InteractionRes::StringRes(v),
                 None => InteractionRes::Nil,
             },
             ListOps::RPush(key, vals) => {
-                engine.create_list_if_necessary(&key);
-                let mut lists = engine.lists.write().unwrap();
-                let list = lists.get_mut(&key).unwrap();
+                state.create_list_if_necessary(&key);
+                write_lists!(state, &key, list);
                 for val in vals {
                     list.push_back(val)
                 }
-                InteractionRes::UIntRes(list.len())
+                InteractionRes::IntRes(list.len() as Count)
             }
             ListOps::RPushX(key, val) => {
-                if !engine.lists.read().unwrap().contains_key(&key) {
-                    return InteractionRes::UIntRes(0);
+                if !read_lists!(state).contains_key(&key) {
+                    return InteractionRes::IntRes(0);
                 }
-                engine.create_list_if_necessary(&key);
-                let mut lists = engine.lists.write().unwrap();
-                let list = lists.get_mut(&key).unwrap();
+                state.create_list_if_necessary(&key);
+                write_lists!(state, &key, list);
                 list.push_back(val);
-                InteractionRes::UIntRes(list.len())
+                InteractionRes::IntRes(list.len() as Count)
             }
-            ListOps::LIndex(key, index) => match engine.lists.read().unwrap().get(&key) {
+            ListOps::LIndex(key, index) => match write_lists!(state, &key) {
                 Some(list) => {
                     let llen = list.len() as i64;
                     let real_index = if index < 0 { llen + index } else { index };
@@ -95,7 +102,7 @@ impl StateInteration for ListOps {
                 }
                 None => InteractionRes::Nil,
             },
-            ListOps::LSet(key, index, value) => match engine.lists.write().unwrap().get_mut(&key) {
+            ListOps::LSet(key, index, value) => match write_lists!(state, &key) {
                 Some(list) => {
                     let llen = list.len() as i64;
                     let real_index = if index < 0 { llen + index } else { index };
@@ -108,37 +115,33 @@ impl StateInteration for ListOps {
                 }
                 None => InteractionRes::Error(b"No list at key!"),
             },
-            ListOps::LRange(key, start_index, end_index) => {
-                match engine.lists.read().unwrap().get(&key) {
-                    Some(list) => {
-                        let start_index = std::cmp::max(
-                            0,
-                            if start_index < 0 { 0 } else { start_index } as usize,
-                        );
-                        let end_index = std::cmp::min(
-                            list.len(),
-                            if end_index < 0 {
-                                list.len() as i64 + end_index
-                            } else {
-                                end_index
-                            } as usize,
-                        );
-                        let mut ret = Vec::new();
-                        for (index, value) in list.iter().enumerate() {
-                            if start_index <= index && index <= end_index {
-                                ret.push(value.clone());
-                            }
-                            if index > end_index {
-                                break;
-                            }
+            ListOps::LRange(key, start_index, end_index) => match read_lists!(state, &key) {
+                Some(list) => {
+                    let start_index =
+                        std::cmp::max(0, if start_index < 0 { 0 } else { start_index } as usize);
+                    let end_index = std::cmp::min(
+                        list.len(),
+                        if end_index < 0 {
+                            list.len() as i64 + end_index
+                        } else {
+                            end_index
+                        } as usize,
+                    );
+                    let mut ret = Vec::new();
+                    for (index, value) in list.iter().enumerate() {
+                        if start_index <= index && index <= end_index {
+                            ret.push(value.clone());
                         }
-                        InteractionRes::MultiStringRes(ret)
+                        if index > end_index {
+                            break;
+                        }
                     }
-                    None => InteractionRes::MultiStringRes(vec![]),
+                    InteractionRes::MultiStringRes(ret)
                 }
-            }
+                None => InteractionRes::MultiStringRes(vec![]),
+            },
             ListOps::LTrim(key, start_index, end_index) => {
-                match engine.lists.write().unwrap().get_mut(&key) {
+                match write_lists!(state, &key) {
                     Some(list) => {
                         let start_index = std::cmp::max(
                             0,
@@ -165,9 +168,9 @@ impl StateInteration for ListOps {
             }
             ListOps::RPopLPush(source, dest) => {
                 if source != dest {
-                    engine.create_list_if_necessary(&dest);
+                    state.create_list_if_necessary(&dest);
                 }
-                let mut lists = engine.lists.write().unwrap();
+                let mut lists = write_lists!(state);
                 match lists.get_mut(&source) {
                     None => InteractionRes::Nil,
                     Some(source_list) => match source_list.pop_back() {

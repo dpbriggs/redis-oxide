@@ -26,11 +26,33 @@ pub enum SetAction {
     Inter,
 }
 
-fn many_set_op(engine: &State, keys: Vec<Key>, op: SetAction) -> Option<HashSet<Value>> {
-    let engine_sets = engine.sets.read().unwrap();
+macro_rules! read_sets {
+    ($state:expr) => {
+        $state.sets.read().unwrap()
+    };
+    ($state: expr, $key: expr) => {
+        $state.sets.read().unwrap().get($key)
+    };
+}
+
+macro_rules! write_sets {
+    ($state:expr) => {
+        $state.sets.write().unwrap()
+    };
+    ($state: expr, $key: expr) => {
+        $state.sets.write().unwrap().get_mut($key)
+    };
+    ($state: expr, $key:expr, $var_name:ident) => {
+        let mut __temp_name = $state.sets.write().unwrap();
+        let $var_name = __temp_name.get_mut($key).unwrap();
+    };
+}
+
+fn many_set_op(state: &State, keys: Vec<Key>, op: SetAction) -> Option<HashSet<Value>> {
+    let state_sets = write_sets!(state);
     let sets: Vec<HashSet<Key>> = keys
         .iter()
-        .filter_map(|key| engine_sets.get(key))
+        .filter_map(|key| state_sets.get(key))
         .cloned()
         .collect();
     if sets.is_empty() {
@@ -48,30 +70,28 @@ fn many_set_op(engine: &State, keys: Vec<Key>, op: SetAction) -> Option<HashSet<
 }
 
 impl StateInteration for SetOps {
-    fn interact(self, engine: State) -> InteractionRes {
+    fn interact(self, state: State) -> InteractionRes {
         match self {
             SetOps::SAdd(set_key, vals) => {
-                engine.create_set_if_necessary(&set_key);
-                let mut sets = engine.sets.write().unwrap();
-                let set = sets.get_mut(&set_key).unwrap();
-
+                state.create_set_if_necessary(&set_key);
+                write_sets!(state, &set_key, set);
                 let mut vals_inserted = 0;
                 for val in vals {
                     if set.insert(val) {
                         vals_inserted += 1;
                     }
                 }
-                InteractionRes::UIntRes(vals_inserted)
+                InteractionRes::IntRes(vals_inserted)
             }
-            SetOps::SMembers(set_key) => match engine.sets.read().unwrap().get(&set_key) {
+            SetOps::SMembers(set_key) => match read_sets!(state, &set_key) {
                 Some(hs) => InteractionRes::MultiStringRes(hs.iter().cloned().collect()),
                 None => InteractionRes::MultiStringRes(vec![]),
             },
-            SetOps::SCard(set_key) => match engine.sets.read().unwrap().get(&set_key) {
-                Some(hs) => InteractionRes::UIntRes(hs.len()),
-                None => InteractionRes::UIntRes(0),
+            SetOps::SCard(set_key) => match read_sets!(state, &set_key) {
+                Some(hs) => InteractionRes::IntRes(hs.len() as Count),
+                None => InteractionRes::IntRes(0),
             },
-            SetOps::SRem(set_key, vals) => match engine.sets.write().unwrap().get_mut(&set_key) {
+            SetOps::SRem(set_key, vals) => match write_sets!(state, &set_key) {
                 Some(hs) => {
                     let mut vals_removed = 0;
                     for val in vals {
@@ -79,60 +99,61 @@ impl StateInteration for SetOps {
                             vals_removed += 1;
                         }
                     }
-                    InteractionRes::UIntRes(vals_removed)
+                    InteractionRes::IntRes(vals_removed)
                 }
-                None => InteractionRes::UIntRes(0),
+                None => InteractionRes::IntRes(0),
             },
-            SetOps::SDiff(keys) => match many_set_op(&engine, keys, SetAction::Diff) {
+            SetOps::SDiff(keys) => match many_set_op(&state, keys, SetAction::Diff) {
                 Some(hash_set) => {
                     InteractionRes::MultiStringRes(hash_set.iter().cloned().collect())
                 }
                 None => InteractionRes::MultiStringRes(vec![]),
             },
-            SetOps::SUnion(keys) => match many_set_op(&engine, keys, SetAction::Union) {
+            SetOps::SUnion(keys) => match many_set_op(&state, keys, SetAction::Union) {
                 Some(hash_set) => {
                     InteractionRes::MultiStringRes(hash_set.iter().cloned().collect())
                 }
                 None => InteractionRes::MultiStringRes(vec![]),
             },
-            SetOps::SInter(keys) => match many_set_op(&engine, keys, SetAction::Inter) {
+            SetOps::SInter(keys) => match many_set_op(&state, keys, SetAction::Inter) {
                 Some(hash_set) => {
                     InteractionRes::MultiStringRes(hash_set.iter().cloned().collect())
                 }
                 None => InteractionRes::MultiStringRes(vec![]),
             },
-            SetOps::SDiffStore(to_store, keys) => match many_set_op(&engine, keys, SetAction::Diff)
-            {
-                Some(hash_set) => {
-                    let hash_set_size = hash_set.len();
-                    engine.sets.write().unwrap().insert(to_store, hash_set);
-                    InteractionRes::UIntRes(hash_set_size)
-                }
-                None => InteractionRes::UIntRes(0),
-            },
-            SetOps::SUnionStore(to_store, keys) => {
-                match many_set_op(&engine, keys, SetAction::Union) {
+            SetOps::SDiffStore(to_store, keys) => {
+                match many_set_op(&state, keys, SetAction::Diff) {
                     Some(hash_set) => {
                         let hash_set_size = hash_set.len();
-                        engine.sets.write().unwrap().insert(to_store, hash_set);
-                        InteractionRes::UIntRes(hash_set_size)
+                        write_sets!(state).insert(to_store, hash_set);
+                        InteractionRes::IntRes(hash_set_size as Count)
                     }
-                    None => InteractionRes::UIntRes(0),
+                    None => InteractionRes::IntRes(0),
+                }
+            }
+            SetOps::SUnionStore(to_store, keys) => {
+                match many_set_op(&state, keys, SetAction::Union) {
+                    Some(hash_set) => {
+                        let hash_set_size = hash_set.len();
+                        write_sets!(state).insert(to_store, hash_set);
+                        InteractionRes::IntRes(hash_set_size as Count)
+                    }
+                    None => InteractionRes::IntRes(0),
                 }
             }
             SetOps::SInterStore(to_store, keys) => {
-                match many_set_op(&engine, keys, SetAction::Inter) {
+                match many_set_op(&state, keys, SetAction::Inter) {
                     Some(hash_set) => {
                         let hash_set_size = hash_set.len();
-                        engine.sets.write().unwrap().insert(to_store, hash_set);
-                        InteractionRes::UIntRes(hash_set_size)
+                        write_sets!(state).insert(to_store, hash_set);
+                        InteractionRes::IntRes(hash_set_size as Count)
                     }
-                    None => InteractionRes::UIntRes(0),
+                    None => InteractionRes::IntRes(0),
                 }
             }
             // There's some surprising complexity behind this command
             SetOps::SPop(key, count) => {
-                let mut sets = engine.sets.write().unwrap();
+                let mut sets = write_sets!(state);
                 let set = match sets.get_mut(&key) {
                     Some(s) => s,
                     None => return InteractionRes::Nil,
@@ -152,29 +173,30 @@ impl StateInteration for SetOps {
                 }
                 InteractionRes::MultiStringRes(eles)
             }
-            SetOps::SIsMember(key, member) => match engine.sets.read().unwrap().get(&key) {
+            SetOps::SIsMember(key, member) => match read_sets!(state, &key) {
                 Some(set) => match set.get(&member) {
-                    Some(_) => InteractionRes::UIntRes(1),
-                    None => InteractionRes::UIntRes(0),
+                    Some(_) => InteractionRes::IntRes(1),
+                    None => InteractionRes::IntRes(0),
                 },
-                None => InteractionRes::UIntRes(0),
+                None => InteractionRes::IntRes(0),
             },
             SetOps::SMove(src, dest, member) => {
-                let sets = engine.sets.read().unwrap();
+                let sets = read_sets!(state);
                 if !sets.contains_key(&src) || !sets.contains_key(&dest) {
-                    return InteractionRes::UIntRes(0);
+                    return InteractionRes::IntRes(0);
                 }
-                let mut sets = engine.sets.write().unwrap();
+
+                let mut sets = write_sets!(state);
                 let src_set = sets.get_mut(&src).unwrap();
                 match src_set.take(&member) {
                     Some(res) => {
                         sets.get_mut(&dest).unwrap().insert(res);
-                        InteractionRes::UIntRes(1)
+                        InteractionRes::IntRes(1)
                     }
-                    None => InteractionRes::UIntRes(0),
+                    None => InteractionRes::IntRes(0),
                 }
             }
-            SetOps::SRandMembers(key, count) => match engine.sets.read().unwrap().get(&key) {
+            SetOps::SRandMembers(key, count) => match read_sets!(state, &key) {
                 Some(set) => {
                     let count = count.unwrap_or(1);
                     if count < 0 {

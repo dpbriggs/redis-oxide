@@ -14,7 +14,7 @@ use tokio::prelude::*;
 use tokio::timer::Interval;
 use tokio_codec::Decoder;
 
-fn process(socket: TcpStream, engine: State) {
+fn process(socket: TcpStream, state: State) {
     let (tx, rx) = RedisValueCodec::default().framed(socket).split();
     // Map all requests into responses and send them back to the client.
     info!(LOGGER, "accepting new connection...");
@@ -22,7 +22,7 @@ fn process(socket: TcpStream, engine: State) {
         .send_all(rx.and_then(move |r: RedisValue| match translate(&r) {
             Ok(op) => {
                 debug!(LOGGER, "running op {:?}", op.clone());
-                let res = engine.clone().interact(op);
+                let res = state.clone().interact(op);
                 Ok(RedisValue::from(res))
             }
             Err(e) => Ok(RedisValue::from(e)),
@@ -37,18 +37,18 @@ fn process(socket: TcpStream, engine: State) {
     tokio::spawn(task);
 }
 
-fn save_state(engine: State) -> impl Future<Item = (), Error = ()> {
+fn save_state(state: State) -> impl Future<Item = (), Error = ()> {
     Interval::new(Instant::now(), Duration::from_millis(60 * 1000))
         .skip(1)
         .for_each(move |_| {
             info!(LOGGER, "Saving state...");
-            debug!(LOGGER, "state: {:?}", engine.save_state());
+            debug!(LOGGER, "state: {:?}", state.save_state());
             Ok(())
         })
         .map_err(|e| error!(LOGGER, "save state failed; err={:?}", e))
 }
 
-fn socket_listener(engine: State) -> impl Future<Item = (), Error = ()> {
+fn socket_listener(state: State) -> impl Future<Item = (), Error = ()> {
     // and set up our redis server.
     let addr = env::args()
         .nth(1)
@@ -61,18 +61,18 @@ fn socket_listener(engine: State) -> impl Future<Item = (), Error = ()> {
         .incoming()
         .map_err(|e| println!("failed to accept socket; error = {:?}", e))
         .for_each(move |socket| {
-            process(socket, engine.clone());
+            process(socket, state.clone());
             Ok(())
         })
         .map_err(|e| panic!("Failed to start server! error = {:?}", e))
 }
 
-pub fn server(engine: State) -> Result<(), MyError> {
+pub fn server(state: State) -> Result<(), MyError> {
     // Parse the address we're going to run this server on
-    // tokio::spawn(save_state(engine.clone()));
+    // tokio::spawn(save_state(state.clone()));
     tokio::run(lazy(move || {
-        tokio::spawn(save_state(engine.clone()));
-        tokio::spawn(socket_listener(engine.clone()));
+        tokio::spawn(save_state(state.clone()));
+        tokio::spawn(socket_listener(state.clone()));
         Ok(())
     }));
     Ok(())

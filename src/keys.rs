@@ -1,4 +1,4 @@
-use crate::types::{InteractionRes, Key, State, StateInteration, Value};
+use crate::types::{Count, InteractionRes, Key, State, StateInteration, Value};
 
 #[derive(Debug, Clone)]
 pub enum KeyOps {
@@ -10,9 +10,9 @@ pub enum KeyOps {
 }
 
 impl StateInteration for KeyOps {
-    fn interact(self, engine: State) -> InteractionRes {
+    fn interact(self, state: State) -> InteractionRes {
         match self {
-            KeyOps::Get(key) => engine
+            KeyOps::Get(key) => state
                 .kv
                 .read()
                 .unwrap()
@@ -21,19 +21,19 @@ impl StateInteration for KeyOps {
                     InteractionRes::StringRes(v.to_vec())
                 }),
             KeyOps::Set(key, value) => {
-                engine.kv.write().unwrap().insert(key.clone(), value);
+                state.kv.write().unwrap().insert(key.clone(), value);
                 InteractionRes::Ok
             }
             KeyOps::Del(keys) => {
                 let deleted = keys
                     .iter()
-                    .map(|x| engine.kv.write().unwrap().remove(x))
+                    .map(|x| state.kv.write().unwrap().remove(x))
                     .filter(Option::is_some)
                     .count();
-                InteractionRes::UIntRes(deleted)
+                InteractionRes::IntRes(deleted as Count)
             }
             KeyOps::Rename(key, new_key) => {
-                let mut keys = engine.kv.write().unwrap();
+                let mut keys = state.kv.write().unwrap();
                 match keys.remove(&key) {
                     Some(value) => {
                         keys.insert(new_key, value);
@@ -75,8 +75,8 @@ mod test_keys {
         fn test_del(l: Value, unused: Value) {
             let eng = State::default();
             eng.clone().interact(gp(KeyOps::Set(l.clone(), l.clone())));
-            assert_eq!(InteractionRes::UIntRes(1), eng.clone().interact(gp(KeyOps::Del(vec![l.clone()]))));
-            assert_eq!(InteractionRes::UIntRes(0), eng.interact(gp(KeyOps::Del(vec![unused]))));
+            assert_eq!(InteractionRes::IntRes(1), eng.clone().interact(gp(KeyOps::Del(vec![l.clone()]))));
+            assert_eq!(InteractionRes::IntRes(0), eng.interact(gp(KeyOps::Del(vec![unused]))));
         }
         #[test]
         fn test_rename(old: Value, v: Value, new: Value) {

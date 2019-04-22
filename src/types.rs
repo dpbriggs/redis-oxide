@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::convert::From;
 use std::sync::{Arc, RwLock};
 
-/// These types are used by engine and ops to actually perform useful work.
+/// These types are used by state and ops to actually perform useful work.
 pub type Value = Vec<u8>;
 /// Key is the standard type to index our structures
 pub type Key = Vec<u8>;
@@ -17,7 +17,7 @@ pub enum RedisValue {
     SimpleString(Value),
     Error(Value),
     BulkString(Value),
-    Int(i64), // is it always i64?
+    Int(i64),
     Array(Vec<RedisValue>),
     NullArray,
     NullBulkString,
@@ -33,7 +33,8 @@ pub enum InteractionRes {
     StringRes(Value),
     Error(&'static [u8]),
     MultiStringRes(Vec<Value>),
-    UIntRes(usize),
+    Array(Vec<InteractionRes>),
+    IntRes(i64),
     Nil,
     // TODO: Figure out how to get the futures working properly.
     // FutureRes(Box<InteractionRes>, Box<Future<Item = (), Error = ()> + Send>),
@@ -52,12 +53,14 @@ impl InteractionRes {
 type KeyString = HashMap<Key, Value>;
 type KeySet = HashMap<Key, HashSet<Value>>;
 type KeyList = HashMap<Key, VecDeque<Value>>;
+type KeyHash = HashMap<Key, HashMap<Key, Value>>;
 
 #[derive(Default, Debug, Clone)]
 pub struct State {
     pub kv: Arc<RwLock<KeyString>>,
     pub sets: Arc<RwLock<KeySet>>,
     pub lists: Arc<RwLock<KeyList>>,
+    pub hashes: Arc<RwLock<KeyHash>>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -65,21 +68,25 @@ pub struct Database {
     pub kv: Vec<u8>,
     pub sets: Vec<u8>,
     pub lists: Vec<u8>,
+    pub hashes: Vec<u8>,
 }
 
 impl From<InteractionRes> for RedisValue {
-    fn from(engine_res: InteractionRes) -> Self {
-        match engine_res {
+    fn from(state_res: InteractionRes) -> Self {
+        match state_res {
             InteractionRes::Ok => RedisValue::SimpleString(vec![b'O', b'K']),
             InteractionRes::Nil => RedisValue::NullBulkString,
             InteractionRes::StringRes(s) => RedisValue::BulkString(s),
             InteractionRes::MultiStringRes(a) => RedisValue::Array(
-                a.iter()
-                    .map(|s| RedisValue::BulkString(s.to_vec()))
+                a.into_iter()
+                    .map(RedisValue::BulkString)
                     .collect(),
             ),
-            InteractionRes::UIntRes(i) => RedisValue::Int(i as i64),
+            InteractionRes::IntRes(i) => RedisValue::Int(i as i64),
             InteractionRes::Error(e) => RedisValue::Error(e.to_vec()),
+            InteractionRes::Array(a) => {
+                RedisValue::Array(a.into_iter().map(RedisValue::from).collect())
+            }
             // InteractionRes::FutureRes(s, _) => RedisValue::from(*s),
             // InteractionRes::FutureResValue(_) => unreachable!(),
         }
@@ -87,5 +94,5 @@ impl From<InteractionRes> for RedisValue {
 }
 
 pub trait StateInteration {
-    fn interact(self, engine: State) -> InteractionRes;
+    fn interact(self, state: State) -> InteractionRes;
 }
