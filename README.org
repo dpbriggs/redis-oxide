@@ -70,11 +70,11 @@ pprint(sum(map(lambda x: int(x), list_res)))
 
 Which will print:
 
-#+begin_example
+#+begin_src python
 b'foobar'
 [b'0', b'1', b'2']
 19800
-#+end_example
+#+end_src
 
 ** Things left to do
 
