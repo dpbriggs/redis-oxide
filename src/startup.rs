@@ -7,12 +7,12 @@ use std::path::PathBuf;
 #[structopt(name = "redis-oxide", about = "The Rusty Redis Clone")]
 #[structopt(raw(setting = "structopt::clap::AppSettings::ColoredHelp"))]
 pub struct Config {
-    /// Database Dump File (default: )
+    /// Database Dump File Directory Location (default: ~/.local/share)
     #[structopt(short = "d", long = "dump-file", parse(from_os_str))]
-    output: Option<PathBuf>,
+    pub data_dir: Option<PathBuf>,
     /// Don't show the starting graphic
     #[structopt(short = "g", long = "no-graphic")]
-    dont_show_graphic: bool,
+    pub dont_show_graphic: bool,
 }
 
 pub fn startup_message(config: &Config) {

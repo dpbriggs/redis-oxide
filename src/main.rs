@@ -20,9 +20,12 @@ extern crate sloggers;
 #[macro_use]
 extern crate combine;
 
+extern crate rmp_serde as rmps;
+
 use structopt::StructOpt;
 
 mod asyncresp;
+mod database;
 mod hashes;
 mod keys;
 mod lists;
@@ -35,16 +38,19 @@ mod startup;
 mod state;
 mod types;
 
+use self::database::{get_dump_file, load_state};
 use self::logger::LOGGER;
 use self::server::server;
 use self::startup::{startup_message, Config};
-use self::types::State;
 
-fn main() {
+fn main() -> Result<(), Box<std::error::Error>> {
     let opt = Config::from_args();
     startup_message(&opt);
     info!(LOGGER, "Initializing State...");
-    let state = State::default();
+    info!(LOGGER, "Opening Datafile...");
+    let dump_file = get_dump_file(&opt);
+    let state = load_state(dump_file.clone())?;
     info!(LOGGER, "Starting Server...");
-    server(state).expect("server failed to start!");
+    server(state, dump_file).expect("server failed to start!");
+    Ok(())
 }

@@ -12,28 +12,23 @@ pub enum KeyOps {
 impl StateInteration for KeyOps {
     fn interact(self, state: State) -> InteractionRes {
         match self {
-            KeyOps::Get(key) => state
-                .kv
-                .read()
-                .unwrap()
-                .get(&key)
-                .map_or(InteractionRes::Nil, |v| {
-                    InteractionRes::StringRes(v.to_vec())
-                }),
+            KeyOps::Get(key) => state.kv.read().get(&key).map_or(InteractionRes::Nil, |v| {
+                InteractionRes::StringRes(v.to_vec())
+            }),
             KeyOps::Set(key, value) => {
-                state.kv.write().unwrap().insert(key.clone(), value);
+                state.kv.write().insert(key.clone(), value);
                 InteractionRes::Ok
             }
             KeyOps::Del(keys) => {
                 let deleted = keys
                     .iter()
-                    .map(|x| state.kv.write().unwrap().remove(x))
+                    .map(|x| state.kv.write().remove(x))
                     .filter(Option::is_some)
                     .count();
                 InteractionRes::IntRes(deleted as Count)
             }
             KeyOps::Rename(key, new_key) => {
-                let mut keys = state.kv.write().unwrap();
+                let mut keys = state.kv.write();
                 match keys.remove(&key) {
                     Some(value) => {
                         keys.insert(new_key, value);

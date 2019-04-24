@@ -1,8 +1,7 @@
 // use rand::Rng;
 use crate::ops::Ops;
 use crate::types::StateInteration;
-use crate::types::{Database, InteractionRes, State};
-use bincode::{serialize, Result as BinCodeResult};
+use crate::types::{InteractionRes, State};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
 
@@ -24,39 +23,32 @@ impl fmt::Display for InteractionRes {
 }
 
 impl State {
-    pub fn save_state(&self) -> BinCodeResult<Vec<u8>> {
-        serialize(&Database {
-            kv: serialize(&*self.kv.read().unwrap()).unwrap(),
-            sets: serialize(&*self.sets.read().unwrap()).unwrap(),
-            lists: serialize(&*self.lists.read().unwrap()).unwrap(),
-            hashes: serialize(&*self.hashes.read().unwrap()).unwrap(),
-        })
-    }
+    // pub fn load(dump_data: &[u8]) -> State {
+    //     let database = deserialize::<Database>(dump_data).unwrap();
+    //     let kv = deserialize::<KeyString>(&database.kv);
+    //     println!("{:?}", kv);
+    //     State::default()
+    // }
 
     pub fn create_list_if_necessary(&self, list_key: &[u8]) {
-        if !self.lists.read().unwrap().contains_key(list_key) {
+        if !self.lists.read().contains_key(list_key) {
             self.lists
                 .write()
-                .unwrap()
                 .insert(list_key.to_vec(), VecDeque::new());
         }
     }
 
     pub fn create_hashes_if_necessary(&self, hashes_key: &[u8]) {
-        if !self.hashes.read().unwrap().contains_key(hashes_key) {
+        if !self.hashes.read().contains_key(hashes_key) {
             self.hashes
                 .write()
-                .unwrap()
                 .insert(hashes_key.to_vec(), HashMap::new());
         }
     }
 
     pub fn create_set_if_necessary(&self, set_key: &[u8]) {
-        if !self.sets.read().unwrap().contains_key(set_key) {
-            self.sets
-                .write()
-                .unwrap()
-                .insert(set_key.to_vec(), HashSet::new());
+        if !self.sets.read().contains_key(set_key) {
+            self.sets.write().insert(set_key.to_vec(), HashSet::new());
         }
     }
 

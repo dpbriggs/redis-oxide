@@ -1,17 +1,16 @@
 use std::env;
 
 use crate::asyncresp::{MyError, RedisValueCodec};
+use crate::database::save_state;
 use crate::logger::LOGGER;
 use crate::{
     ops::translate,
-    types::{RedisValue, State},
+    types::{DumpFile, RedisValue, State},
 };
 use futures::future::lazy;
 use std::net::SocketAddr;
-use std::time::{Duration, Instant};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::*;
-use tokio::timer::Interval;
 use tokio_codec::Decoder;
 
 fn process(socket: TcpStream, state: State) {
@@ -37,17 +36,6 @@ fn process(socket: TcpStream, state: State) {
     tokio::spawn(task);
 }
 
-fn save_state(state: State) -> impl Future<Item = (), Error = ()> {
-    Interval::new(Instant::now(), Duration::from_millis(60 * 1000))
-        .skip(1)
-        .for_each(move |_| {
-            info!(LOGGER, "Saving state...");
-            debug!(LOGGER, "state: {:?}", state.save_state());
-            Ok(())
-        })
-        .map_err(|e| error!(LOGGER, "save state failed; err={:?}", e))
-}
-
 fn socket_listener(state: State) -> impl Future<Item = (), Error = ()> {
     // and set up our redis server.
     let addr = env::args()
@@ -67,11 +55,11 @@ fn socket_listener(state: State) -> impl Future<Item = (), Error = ()> {
         .map_err(|e| panic!("Failed to start server! error = {:?}", e))
 }
 
-pub fn server(state: State) -> Result<(), MyError> {
+pub fn server(state: State, dump_file: DumpFile) -> Result<(), MyError> {
     // Parse the address we're going to run this server on
     // tokio::spawn(save_state(state.clone()));
     tokio::run(lazy(move || {
-        tokio::spawn(save_state(state.clone()));
+        tokio::spawn(save_state(state.clone(), dump_file));
         tokio::spawn(socket_listener(state.clone()));
         Ok(())
     }));

@@ -20,22 +20,26 @@ pub enum ListOps {
 
 macro_rules! read_lists {
     ($state:expr) => {
-        $state.lists.read().unwrap()
+        $state.lists.read()
     };
-    ($state: expr, $key: expr) => {
-        $state.lists.read().unwrap().get($key)
+    ($state:expr, $key:expr) => {
+        $state.lists.read().get($key)
+    };
+    ($state:expr, $key:expr, $var_name:ident) => {
+        let __temp_name = $state.lists.read();
+        let $var_name = __temp_name.get($key);
     };
 }
 
 macro_rules! write_lists {
     ($state:expr) => {
-        $state.lists.write().unwrap()
+        $state.lists.write()
     };
-    ($state: expr, $key: expr) => {
-        $state.lists.write().unwrap().get_mut($key)
+    ($state:expr, $key:expr) => {
+        $state.lists.write().get_mut($key)
     };
     ($state: expr, $key:expr, $var_name:ident) => {
-        let mut __temp_name = $state.lists.write().unwrap();
+        let mut __temp_name = $state.lists.write();
         let $var_name = __temp_name.get_mut($key).unwrap();
     };
 }

@@ -14,21 +14,21 @@ impl StateInteration for MiscOps {
         match self {
             MiscOps::Pong => InteractionRes::StringRes(b"PONG".to_vec()),
             MiscOps::FlushAll => {
-                state.kv.write().unwrap().clear();
-                state.sets.write().unwrap().clear();
-                state.lists.write().unwrap().clear();
+                state.kv.write().clear();
+                state.sets.write().clear();
+                state.lists.write().clear();
                 InteractionRes::Ok
             }
             MiscOps::Exists(keys) => InteractionRes::IntRes(
                 keys.iter()
-                    .map(|key| state.kv.read().unwrap().contains_key(key))
+                    .map(|key| state.kv.read().contains_key(key))
                     .filter(|exists| *exists)
                     .count() as Count,
             ),
             MiscOps::Keys => {
-                let mut kv_keys: Vec<Key> = state.kv.read().unwrap().keys().cloned().collect();
-                let mut set_keys: Vec<Key> = state.sets.read().unwrap().keys().cloned().collect();
-                let mut list_keys: Vec<Key> = state.lists.read().unwrap().keys().cloned().collect();
+                let mut kv_keys: Vec<Key> = state.kv.read().keys().cloned().collect();
+                let mut set_keys: Vec<Key> = state.sets.read().keys().cloned().collect();
+                let mut list_keys: Vec<Key> = state.lists.read().keys().cloned().collect();
                 kv_keys.append(&mut set_keys);
                 kv_keys.append(&mut list_keys);
                 InteractionRes::MultiStringRes(kv_keys)

@@ -25,25 +25,28 @@ pub enum SetAction {
     Union,
     Inter,
 }
-
 macro_rules! read_sets {
     ($state:expr) => {
-        $state.sets.read().unwrap()
+        $state.sets.read()
     };
-    ($state: expr, $key: expr) => {
-        $state.sets.read().unwrap().get($key)
+    ($state:expr, $key:expr) => {
+        $state.sets.read().get($key)
+    };
+    ($state:expr, $key:expr, $var_name:ident) => {
+        let __temp_name = $state.sets.read();
+        let $var_name = __temp_name.get($key);
     };
 }
 
 macro_rules! write_sets {
     ($state:expr) => {
-        $state.sets.write().unwrap()
+        $state.sets.write()
     };
-    ($state: expr, $key: expr) => {
-        $state.sets.write().unwrap().get_mut($key)
+    ($state:expr, $key:expr) => {
+        $state.sets.write().get_mut($key)
     };
     ($state: expr, $key:expr, $var_name:ident) => {
-        let mut __temp_name = $state.sets.write().unwrap();
+        let mut __temp_name = $state.sets.write();
         let $var_name = __temp_name.get_mut($key).unwrap();
     };
 }

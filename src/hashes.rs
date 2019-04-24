@@ -12,27 +12,27 @@ pub enum HashOps {
 
 macro_rules! read_hashes {
     ($state:expr) => {
-        $state.hashes.read().unwrap()
+        $state.hashes.read()
     };
     ($state:expr, $key:expr) => {
-        $state.hashes.read().unwrap().get($key)
+        $state.hashes.read().get($key)
     };
     ($state:expr, $key:expr, $var_name:ident) => {
-        let __temp_name = $state.hashes.read().unwrap();
+        let __temp_name = $state.hashes.read();
         let $var_name = __temp_name.get($key);
     };
 }
 
 macro_rules! write_hashes {
     ($state:expr) => {
-        $state.hashes.write().unwrap()
+        $state.hashes.write()
     };
     ($state:expr, $key:expr) => {
-        $state.hashes.write().unwrap().get($key)
+        $state.hashes.write().get($key)
     };
     ($state: expr, $key:expr, $var_name:ident) => {
-        let mut __temp_name = $state.hashes.write().unwrap();
-        let $var_name = __temp_name.get_mut($key).unwrap();
+        let mut __temp_name = $state.hashes.write();
+        let $var_name = __temp_name.get_mut($key);
     };
 }
 
@@ -48,7 +48,7 @@ impl StateInteration for HashOps {
             HashOps::HSet(key, field, value) => {
                 state.create_hashes_if_necessary(&key);
                 write_hashes!(state, &key, hash);
-                hash.insert(field, value);
+                hash.unwrap().insert(field, value);
                 InteractionRes::Ok
             }
             HashOps::HExists(key, field) => read_hashes!(state)
@@ -69,23 +69,19 @@ impl StateInteration for HashOps {
                 }
                 InteractionRes::MultiStringRes(ret)
             }
-            HashOps::HMGet(key, fields) => match read_hashes!(state, &key) {
-                None => InteractionRes::Array(
-                    std::iter::repeat_with(|| InteractionRes::Nil)
-                        .take(fields.len())
-                        .collect(),
-                ),
-                Some(hash) => InteractionRes::Array(
-                    fields
-                        .iter()
-                        .map(|field| {
-                            hash.get(field).map_or(InteractionRes::Nil, |v| {
-                                InteractionRes::StringRes(v.clone())
-                            })
+            HashOps::HMGet(key, fields) => InteractionRes::Array(match read_hashes!(state, &key) {
+                None => std::iter::repeat_with(|| InteractionRes::Nil)
+                    .take(fields.len())
+                    .collect(),
+                Some(hash) => fields
+                    .iter()
+                    .map(|field| {
+                        hash.get(field).map_or(InteractionRes::Nil, |v| {
+                            InteractionRes::StringRes(v.clone())
                         })
-                        .collect(),
-                ),
-            },
+                    })
+                    .collect(),
+            }),
         }
     }
 }

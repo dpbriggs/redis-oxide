@@ -1,7 +1,11 @@
 // use futures::future::Future;
+use parking_lot::RwLock;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::convert::From;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+
+use parking_lot::Mutex;
+use std::fs::File;
 
 /// These types are used by state and ops to actually perform useful work.
 pub type Value = Vec<u8>;
@@ -10,6 +14,8 @@ pub type Key = Vec<u8>;
 /// Count is used for commands that count.
 pub type Count = i64;
 pub type Index = i64;
+
+pub type DumpFile = Arc<Mutex<File>>;
 
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, Clone)]
@@ -63,7 +69,7 @@ pub struct State {
     pub hashes: Arc<RwLock<KeyHash>>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Database {
     pub kv: Vec<u8>,
     pub sets: Vec<u8>,
