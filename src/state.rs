@@ -1,23 +1,23 @@
 // use rand::Rng;
 use crate::ops::Ops;
 use crate::types::StateInteration;
-use crate::types::{InteractionRes, State};
+use crate::types::{InteractionRes, ReturnValue, State};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
 
-impl fmt::Display for InteractionRes {
+impl fmt::Display for ReturnValue {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            InteractionRes::Ok => write!(f, "OK"),
-            InteractionRes::StringRes(s) => write!(f, "{:?}", s),
-            InteractionRes::IntRes(i) => write!(f, "{:?}", i),
-            InteractionRes::MultiStringRes(ss) => write!(f, "{:?}", ss),
-            InteractionRes::Nil => write!(f, "(nil)"),
-            InteractionRes::Error(e) => write!(f, "ERR {:?}", e),
-            InteractionRes::Array(a) => write!(f, "{:?}", a),
+            ReturnValue::Ok => write!(f, "OK"),
+            ReturnValue::StringRes(s) => write!(f, "{:?}", s),
+            ReturnValue::IntRes(i) => write!(f, "{:?}", i),
+            ReturnValue::MultiStringRes(ss) => write!(f, "{:?}", ss),
+            ReturnValue::Nil => write!(f, "(nil)"),
+            ReturnValue::Error(e) => write!(f, "ERR {:?}", e),
+            ReturnValue::Array(a) => write!(f, "{:?}", a),
             // TODO: Figure out how make futures work
-            // InteractionRes::FutureRes(v, _) => (*v).fmt(f),
-            // InteractionRes::FutureResValue(_) => unreachable!(),
+            // ReturnValue::FutureRes(v, _) => (*v).fmt(f),
+            // ReturnValue::FutureResValue(_) => unreachable!(),
         }
     }
 }

@@ -342,6 +342,11 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
             let key = Key::try_from(tail[0])?;
             Ok(Ops::Lists(ListOps::LPop(key)))
         }
+        "blpop" => {
+            verify_size(&tail, 1)?;
+            let key = Key::try_from(tail[0])?;
+            Ok(Ops::Lists(ListOps::BLPop(key)))
+        }
         "rpop" => {
             verify_size(&tail, 1)?;
             let key = Key::try_from(tail[0])?;

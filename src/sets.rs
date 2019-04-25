@@ -1,4 +1,4 @@
-use crate::types::{Count, InteractionRes, Key, State, StateInteration, Value};
+use crate::types::{Count, InteractionRes, Key, ReturnValue, State, StateInteration, Value};
 use std::collections::HashSet;
 
 #[derive(Debug, Clone)]
@@ -84,15 +84,15 @@ impl StateInteration for SetOps {
                         vals_inserted += 1;
                     }
                 }
-                InteractionRes::IntRes(vals_inserted)
+                ReturnValue::IntRes(vals_inserted)
             }
             SetOps::SMembers(set_key) => match read_sets!(state, &set_key) {
-                Some(hs) => InteractionRes::MultiStringRes(hs.iter().cloned().collect()),
-                None => InteractionRes::MultiStringRes(vec![]),
+                Some(hs) => ReturnValue::MultiStringRes(hs.iter().cloned().collect()),
+                None => ReturnValue::MultiStringRes(vec![]),
             },
             SetOps::SCard(set_key) => match read_sets!(state, &set_key) {
-                Some(hs) => InteractionRes::IntRes(hs.len() as Count),
-                None => InteractionRes::IntRes(0),
+                Some(hs) => ReturnValue::IntRes(hs.len() as Count),
+                None => ReturnValue::IntRes(0),
             },
             SetOps::SRem(set_key, vals) => match write_sets!(state, &set_key) {
                 Some(hs) => {
@@ -102,36 +102,30 @@ impl StateInteration for SetOps {
                             vals_removed += 1;
                         }
                     }
-                    InteractionRes::IntRes(vals_removed)
+                    ReturnValue::IntRes(vals_removed)
                 }
-                None => InteractionRes::IntRes(0),
+                None => ReturnValue::IntRes(0),
             },
             SetOps::SDiff(keys) => match many_set_op(&state, keys, SetAction::Diff) {
-                Some(hash_set) => {
-                    InteractionRes::MultiStringRes(hash_set.iter().cloned().collect())
-                }
-                None => InteractionRes::MultiStringRes(vec![]),
+                Some(hash_set) => ReturnValue::MultiStringRes(hash_set.iter().cloned().collect()),
+                None => ReturnValue::MultiStringRes(vec![]),
             },
             SetOps::SUnion(keys) => match many_set_op(&state, keys, SetAction::Union) {
-                Some(hash_set) => {
-                    InteractionRes::MultiStringRes(hash_set.iter().cloned().collect())
-                }
-                None => InteractionRes::MultiStringRes(vec![]),
+                Some(hash_set) => ReturnValue::MultiStringRes(hash_set.iter().cloned().collect()),
+                None => ReturnValue::MultiStringRes(vec![]),
             },
             SetOps::SInter(keys) => match many_set_op(&state, keys, SetAction::Inter) {
-                Some(hash_set) => {
-                    InteractionRes::MultiStringRes(hash_set.iter().cloned().collect())
-                }
-                None => InteractionRes::MultiStringRes(vec![]),
+                Some(hash_set) => ReturnValue::MultiStringRes(hash_set.iter().cloned().collect()),
+                None => ReturnValue::MultiStringRes(vec![]),
             },
             SetOps::SDiffStore(to_store, keys) => {
                 match many_set_op(&state, keys, SetAction::Diff) {
                     Some(hash_set) => {
                         let hash_set_size = hash_set.len();
                         write_sets!(state).insert(to_store, hash_set);
-                        InteractionRes::IntRes(hash_set_size as Count)
+                        ReturnValue::IntRes(hash_set_size as Count)
                     }
-                    None => InteractionRes::IntRes(0),
+                    None => ReturnValue::IntRes(0),
                 }
             }
             SetOps::SUnionStore(to_store, keys) => {
@@ -139,9 +133,9 @@ impl StateInteration for SetOps {
                     Some(hash_set) => {
                         let hash_set_size = hash_set.len();
                         write_sets!(state).insert(to_store, hash_set);
-                        InteractionRes::IntRes(hash_set_size as Count)
+                        ReturnValue::IntRes(hash_set_size as Count)
                     }
-                    None => InteractionRes::IntRes(0),
+                    None => ReturnValue::IntRes(0),
                 }
             }
             SetOps::SInterStore(to_store, keys) => {
@@ -149,9 +143,9 @@ impl StateInteration for SetOps {
                     Some(hash_set) => {
                         let hash_set_size = hash_set.len();
                         write_sets!(state).insert(to_store, hash_set);
-                        InteractionRes::IntRes(hash_set_size as Count)
+                        ReturnValue::IntRes(hash_set_size as Count)
                     }
-                    None => InteractionRes::IntRes(0),
+                    None => ReturnValue::IntRes(0),
                 }
             }
             // There's some surprising complexity behind this command
@@ -159,34 +153,34 @@ impl StateInteration for SetOps {
                 let mut sets = write_sets!(state);
                 let set = match sets.get_mut(&key) {
                     Some(s) => s,
-                    None => return InteractionRes::Nil,
+                    None => return ReturnValue::Nil.into(),
                 };
                 if set.is_empty() && count.is_some() {
-                    return InteractionRes::MultiStringRes(vec![]);
+                    return ReturnValue::MultiStringRes(vec![]).into();
                 } else if set.is_empty() {
-                    return InteractionRes::Nil;
+                    return ReturnValue::Nil.into();
                 }
                 let count = count.unwrap_or(1);
                 if count < 0 {
-                    return InteractionRes::Error(b"Count cannot be less than 0!");
+                    return ReturnValue::Error(b"Count cannot be less than 0!").into();
                 }
                 let eles: Vec<Value> = set.iter().take(count as usize).cloned().collect();
                 for ele in eles.iter() {
                     set.remove(ele);
                 }
-                InteractionRes::MultiStringRes(eles)
+                ReturnValue::MultiStringRes(eles)
             }
             SetOps::SIsMember(key, member) => match read_sets!(state, &key) {
                 Some(set) => match set.get(&member) {
-                    Some(_) => InteractionRes::IntRes(1),
-                    None => InteractionRes::IntRes(0),
+                    Some(_) => ReturnValue::IntRes(1),
+                    None => ReturnValue::IntRes(0),
                 },
-                None => InteractionRes::IntRes(0),
+                None => ReturnValue::IntRes(0),
             },
             SetOps::SMove(src, dest, member) => {
                 let sets = read_sets!(state);
                 if !sets.contains_key(&src) || !sets.contains_key(&dest) {
-                    return InteractionRes::IntRes(0);
+                    return ReturnValue::IntRes(0).into();
                 }
 
                 let mut sets = write_sets!(state);
@@ -194,25 +188,25 @@ impl StateInteration for SetOps {
                 match src_set.take(&member) {
                     Some(res) => {
                         sets.get_mut(&dest).unwrap().insert(res);
-                        InteractionRes::IntRes(1)
+                        ReturnValue::IntRes(1)
                     }
-                    None => InteractionRes::IntRes(0),
+                    None => ReturnValue::IntRes(0),
                 }
             }
             SetOps::SRandMembers(key, count) => match read_sets!(state, &key) {
                 Some(set) => {
                     let count = count.unwrap_or(1);
                     if count < 0 {
-                        return InteractionRes::MultiStringRes(
+                        return ReturnValue::MultiStringRes(
                             set.iter().cycle().take(-count as usize).cloned().collect(),
-                        );
+                        )
+                        .into();
                     };
-                    InteractionRes::MultiStringRes(
-                        set.iter().take(count as usize).cloned().collect(),
-                    )
+                    ReturnValue::MultiStringRes(set.iter().take(count as usize).cloned().collect())
                 }
-                None => InteractionRes::Nil,
+                None => ReturnValue::Nil,
             },
         }
+        .into()
     }
 }

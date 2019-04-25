@@ -25,6 +25,7 @@ extern crate rmp_serde as rmps;
 use structopt::StructOpt;
 
 mod asyncresp;
+mod blocking;
 mod database;
 mod hashes;
 mod keys;

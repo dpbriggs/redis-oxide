@@ -1,4 +1,4 @@
-use crate::types::{InteractionRes, Key, State, StateInteration, Value};
+use crate::types::{InteractionRes, Key, ReturnValue, State, StateInteration, Value};
 
 #[derive(Debug, Clone)]
 pub enum HashOps {
@@ -42,46 +42,44 @@ impl StateInteration for HashOps {
             HashOps::HGet(key, field) => read_hashes!(state)
                 .get(&key)
                 .and_then(|hashes| hashes.get(&field))
-                .map_or(InteractionRes::Nil, |v| {
-                    InteractionRes::StringRes(v.clone())
-                }),
+                .map_or(ReturnValue::Nil, |v| ReturnValue::StringRes(v.clone())),
             HashOps::HSet(key, field, value) => {
                 state.create_hashes_if_necessary(&key);
                 write_hashes!(state, &key, hash);
                 hash.unwrap().insert(field, value);
-                InteractionRes::Ok
+                ReturnValue::Ok
             }
             HashOps::HExists(key, field) => read_hashes!(state)
                 .get(&key)
                 .map(|hashes| hashes.contains_key(&field))
-                .map_or(InteractionRes::IntRes(0), |v: bool| {
-                    InteractionRes::IntRes(if v { 1 } else { 0 })
+                .map_or(ReturnValue::IntRes(0), |v: bool| {
+                    ReturnValue::IntRes(if v { 1 } else { 0 })
                 }),
             HashOps::HGetAll(key) => {
                 read_hashes!(state, &key, hash);
                 if hash.is_none() {
-                    return InteractionRes::MultiStringRes(vec![]);
+                    return ReturnValue::MultiStringRes(vec![]).into();
                 }
                 let mut ret = Vec::new();
                 for (key, val) in hash.unwrap().iter() {
                     ret.push(key.clone());
                     ret.push(val.clone());
                 }
-                InteractionRes::MultiStringRes(ret)
+                ReturnValue::MultiStringRes(ret)
             }
-            HashOps::HMGet(key, fields) => InteractionRes::Array(match read_hashes!(state, &key) {
-                None => std::iter::repeat_with(|| InteractionRes::Nil)
+            HashOps::HMGet(key, fields) => ReturnValue::Array(match read_hashes!(state, &key) {
+                None => std::iter::repeat_with(|| ReturnValue::Nil)
                     .take(fields.len())
                     .collect(),
                 Some(hash) => fields
                     .iter()
                     .map(|field| {
-                        hash.get(field).map_or(InteractionRes::Nil, |v| {
-                            InteractionRes::StringRes(v.clone())
-                        })
+                        hash.get(field)
+                            .map_or(ReturnValue::Nil, |v| ReturnValue::StringRes(v.clone()))
                     })
                     .collect(),
             }),
         }
+        .into()
     }
 }

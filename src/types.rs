@@ -3,6 +3,7 @@ use parking_lot::RwLock;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::convert::From;
 use std::sync::Arc;
+use tokio::prelude::*;
 
 use parking_lot::Mutex;
 use std::fs::File;
@@ -34,22 +35,46 @@ pub const NULL_ARRAY: &str = "*-1\r\n";
 pub const EMPTY_ARRAY: &str = "*0\r\n";
 
 #[derive(Debug, PartialEq)]
-pub enum InteractionRes {
+pub enum ReturnValue {
     Ok,
     StringRes(Value),
     Error(&'static [u8]),
     MultiStringRes(Vec<Value>),
-    Array(Vec<InteractionRes>),
+    Array(Vec<ReturnValue>),
     IntRes(i64),
     Nil,
     // TODO: Figure out how to get the futures working properly.
-    // FutureRes(Box<InteractionRes>, Box<Future<Item = (), Error = ()> + Send>),
+    // FutureRes(Box<ReturnValue>, Box<Future<Item = (), Error = ()> + Send>),
     // FutureResValue(Box<Future<Item = (), Error = ()> + Send>),
 }
 
-impl InteractionRes {
+impl From<ReturnValue> for InteractionRes {
+    fn from(int: ReturnValue) -> InteractionRes {
+        InteractionRes::Immediate(int)
+    }
+}
+
+pub enum InteractionRes {
+    Immediate(ReturnValue),
+    ImmediateWithWork(ReturnValue, Box<Future<Item = (), Error = ()> + Send>),
+    Blocking(Box<Future<Item = ReturnValue, Error = ()> + Send>),
+}
+
+impl std::fmt::Debug for InteractionRes {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            InteractionRes::Immediate(v) => write!(f, "{:?}", v),
+            InteractionRes::ImmediateWithWork(v, _) => {
+                write!(f, "ImmediateWithWork({:?}, Box<Future>)", v)
+            }
+            InteractionRes::Blocking(_) => write!(f, "foobar"),
+        }
+    }
+}
+
+impl ReturnValue {
     pub fn is_error(&self) -> bool {
-        if let InteractionRes::Error(_) = *self {
+        if let ReturnValue::Error(_) = *self {
             return true;
         }
         false
@@ -77,24 +102,24 @@ pub struct Database {
     pub hashes: Vec<u8>,
 }
 
-impl From<InteractionRes> for RedisValue {
-    fn from(state_res: InteractionRes) -> Self {
+impl From<ReturnValue> for RedisValue {
+    fn from(state_res: ReturnValue) -> Self {
         match state_res {
-            InteractionRes::Ok => RedisValue::SimpleString(vec![b'O', b'K']),
-            InteractionRes::Nil => RedisValue::NullBulkString,
-            InteractionRes::StringRes(s) => RedisValue::BulkString(s),
-            InteractionRes::MultiStringRes(a) => RedisValue::Array(
+            ReturnValue::Ok => RedisValue::SimpleString(vec![b'O', b'K']),
+            ReturnValue::Nil => RedisValue::NullBulkString,
+            ReturnValue::StringRes(s) => RedisValue::BulkString(s),
+            ReturnValue::MultiStringRes(a) => RedisValue::Array(
                 a.into_iter()
                     .map(RedisValue::BulkString)
                     .collect(),
             ),
-            InteractionRes::IntRes(i) => RedisValue::Int(i as i64),
-            InteractionRes::Error(e) => RedisValue::Error(e.to_vec()),
-            InteractionRes::Array(a) => {
+            ReturnValue::IntRes(i) => RedisValue::Int(i as i64),
+            ReturnValue::Error(e) => RedisValue::Error(e.to_vec()),
+            ReturnValue::Array(a) => {
                 RedisValue::Array(a.into_iter().map(RedisValue::from).collect())
             }
-            // InteractionRes::FutureRes(s, _) => RedisValue::from(*s),
-            // InteractionRes::FutureResValue(_) => unreachable!(),
+            // ReturnValue::FutureRes(s, _) => RedisValue::from(*s),
+            // ReturnValue::FutureResValue(_) => unreachable!(),
         }
     }
 }

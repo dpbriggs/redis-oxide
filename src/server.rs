@@ -5,7 +5,7 @@ use crate::database::save_state;
 use crate::logger::LOGGER;
 use crate::{
     ops::translate,
-    types::{DumpFile, RedisValue, State},
+    types::{DumpFile, InteractionRes, RedisValue, State},
 };
 use futures::future::lazy;
 use std::net::SocketAddr;
@@ -22,7 +22,21 @@ fn process(socket: TcpStream, state: State) {
             Ok(op) => {
                 debug!(LOGGER, "running op {:?}", op.clone());
                 let res = state.clone().interact(op);
-                Ok(RedisValue::from(res))
+                match res {
+                    InteractionRes::Immediate(r) => Ok(RedisValue::from(r)),
+                    InteractionRes::ImmediateWithWork(r, w) => {
+                        tokio::spawn(w);
+                        Ok(RedisValue::from(r))
+                    }
+                    InteractionRes::Blocking(_w) => {
+                        // TODO: Use actual await when tokio works with latest nightly
+                        // XXX: This kills the server.
+                        // let r = w.wait().unwrap();
+                        // Ok(RedisValue::from(r))
+                        Ok(RedisValue::NullBulkString)
+                    }
+                }
+                // Ok(RedisValue::from(res))
             }
             Err(e) => Ok(RedisValue::from(e)),
         }))

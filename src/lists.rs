@@ -1,4 +1,5 @@
-use crate::types::{Count, Index, InteractionRes, Key, State, StateInteration, Value};
+use crate::blocking::NilBlocking;
+use crate::types::{Count, Index, InteractionRes, Key, ReturnValue, State, StateInteration, Value};
 use std::collections::VecDeque;
 
 #[derive(Debug, Clone)]
@@ -16,6 +17,7 @@ pub enum ListOps {
     RPush(Key, Vec<Value>),
     RPushX(Key, Value),
     RPopLPush(Key, Key),
+    BLPop(Key),
 }
 
 macro_rules! read_lists {
@@ -54,28 +56,28 @@ impl StateInteration for ListOps {
                 for val in vals {
                     list.push_front(val)
                 }
-                InteractionRes::IntRes(list.len() as Count)
+                ReturnValue::IntRes(list.len() as Count).into()
             }
             ListOps::LPushX(key, val) => {
                 if !read_lists!(state).contains_key(&key) {
-                    return InteractionRes::IntRes(0);
+                    return ReturnValue::IntRes(0).into();
                 }
                 state.create_list_if_necessary(&key);
                 write_lists!(state, &key, list);
                 list.push_front(val);
-                InteractionRes::IntRes(list.len() as Count)
+                ReturnValue::IntRes(list.len() as Count).into()
             }
             ListOps::LLen(key) => match read_lists!(state, &key) {
-                Some(l) => InteractionRes::IntRes(l.len() as Count),
-                None => InteractionRes::IntRes(0),
+                Some(l) => ReturnValue::IntRes(l.len() as Count).into(),
+                None => ReturnValue::IntRes(0).into(),
             },
             ListOps::LPop(key) => match write_lists!(state, &key).and_then(VecDeque::pop_front) {
-                Some(v) => InteractionRes::StringRes(v),
-                None => InteractionRes::Nil,
+                Some(v) => ReturnValue::StringRes(v).into(),
+                None => ReturnValue::Nil.into(),
             },
             ListOps::RPop(key) => match write_lists!(state, &key).and_then(VecDeque::pop_back) {
-                Some(v) => InteractionRes::StringRes(v),
-                None => InteractionRes::Nil,
+                Some(v) => ReturnValue::StringRes(v).into(),
+                None => ReturnValue::Nil.into(),
             },
             ListOps::RPush(key, vals) => {
                 state.create_list_if_necessary(&key);
@@ -83,41 +85,41 @@ impl StateInteration for ListOps {
                 for val in vals {
                     list.push_back(val)
                 }
-                InteractionRes::IntRes(list.len() as Count)
+                ReturnValue::IntRes(list.len() as Count).into()
             }
             ListOps::RPushX(key, val) => {
                 if !read_lists!(state).contains_key(&key) {
-                    return InteractionRes::IntRes(0);
+                    return ReturnValue::IntRes(0).into();
                 }
                 state.create_list_if_necessary(&key);
                 write_lists!(state, &key, list);
                 list.push_back(val);
-                InteractionRes::IntRes(list.len() as Count)
+                ReturnValue::IntRes(list.len() as Count).into()
             }
             ListOps::LIndex(key, index) => match write_lists!(state, &key) {
                 Some(list) => {
                     let llen = list.len() as i64;
                     let real_index = if index < 0 { llen + index } else { index };
                     if !(0 <= real_index && real_index < llen) {
-                        return InteractionRes::Error(b"Bad Range!");
+                        return ReturnValue::Error(b"Bad Range!").into();
                     }
                     let real_index = real_index as usize;
-                    InteractionRes::StringRes(list[real_index].to_vec())
+                    ReturnValue::StringRes(list[real_index].to_vec()).into()
                 }
-                None => InteractionRes::Nil,
+                None => ReturnValue::Nil.into(),
             },
             ListOps::LSet(key, index, value) => match write_lists!(state, &key) {
                 Some(list) => {
                     let llen = list.len() as i64;
                     let real_index = if index < 0 { llen + index } else { index };
                     if !(0 <= real_index && real_index < llen) {
-                        return InteractionRes::Error(b"Bad Range!");
+                        return ReturnValue::Error(b"Bad Range!").into();
                     }
                     let real_index = real_index as usize;
                     list[real_index] = value;
-                    InteractionRes::Ok
+                    ReturnValue::Ok.into()
                 }
-                None => InteractionRes::Error(b"No list at key!"),
+                None => ReturnValue::Error(b"No list at key!").into(),
             },
             ListOps::LRange(key, start_index, end_index) => match read_lists!(state, &key) {
                 Some(list) => {
@@ -140,9 +142,9 @@ impl StateInteration for ListOps {
                             break;
                         }
                     }
-                    InteractionRes::MultiStringRes(ret)
+                    ReturnValue::MultiStringRes(ret).into()
                 }
-                None => InteractionRes::MultiStringRes(vec![]),
+                None => ReturnValue::MultiStringRes(vec![]).into(),
             },
             ListOps::LTrim(key, start_index, end_index) => {
                 match write_lists!(state, &key) {
@@ -165,9 +167,9 @@ impl StateInteration for ListOps {
                         for _ in 0..start_index {
                             list.pop_front();
                         }
-                        InteractionRes::Ok
+                        ReturnValue::Ok.into()
                     }
-                    None => InteractionRes::Ok,
+                    None => ReturnValue::Ok.into(),
                 }
             }
             ListOps::RPopLPush(source, dest) => {
@@ -176,19 +178,34 @@ impl StateInteration for ListOps {
                 }
                 let mut lists = write_lists!(state);
                 match lists.get_mut(&source) {
-                    None => InteractionRes::Nil,
+                    None => ReturnValue::Nil.into(),
                     Some(source_list) => match source_list.pop_back() {
-                        None => InteractionRes::Nil,
+                        None => ReturnValue::Nil.into(),
                         Some(value) => {
                             if source == dest {
                                 source_list.push_back(value.clone());
                             } else {
                                 lists.get_mut(&dest).unwrap().push_back(value.clone());
                             }
-                            InteractionRes::StringRes(value)
+                            ReturnValue::StringRes(value).into()
                         }
                     },
                 }
+            }
+            ListOps::BLPop(key) => {
+                // ListOps::LPop(key) => match write_lists!(state, &key).and_then(VecDeque::pop_front) {
+                //     Some(v) => ReturnValue::StringRes(v).into(),
+                //     None => ReturnValue::Nil.into(),
+                // },
+
+                // let key_copy = key.clone();
+                // let state_ptr = state.clone();
+                let bl = move || match write_lists!(state, &key).and_then(VecDeque::pop_front) {
+                    Some(v) => Some(ReturnValue::StringRes(v)),
+                    None => None,
+                };
+                NilBlocking::interaction_res(Box::new(bl))
+                // InteractionRes::Blocking(Box::new(NilBlocking::new(Box::new(bl))))
             }
         }
     }

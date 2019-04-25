@@ -117,8 +117,8 @@ The general design of =redis-oxide= is:
 - This gets converted to an =Ops::XYZ(XYZOps::Foobar(..))= enum object, which implements the =StateInteration= trait.
   - This nested enum is a dirty way to get static dispatch and hacky-polymorphism. If you can find a nice generic way to represent this, please let me know!
 - This operation is executed against the global =State= object (using the =StateInteraction= trait).
-  - This will return an =InteractionRes= type, which is a more convenient form of =RedisValue=.
-  - This =InteractionRes= is converted and sent back to the client.
+  - This will return an =ReturnValue= type, which is a more convenient form of =RedisValue=.
+  - This =ReturnValue= is converted and sent back to the client.
 
 Therefore, if you want to do something like implement =hashes=, you will need to:
 

@@ -1,4 +1,4 @@
-use crate::types::{Count, InteractionRes, Key, State, StateInteration};
+use crate::types::{Count, InteractionRes, Key, ReturnValue, State, StateInteration};
 
 #[derive(Debug, Clone)]
 pub enum MiscOps {
@@ -12,14 +12,14 @@ impl StateInteration for MiscOps {
     fn interact(self, state: State) -> InteractionRes {
         // match self {}
         match self {
-            MiscOps::Pong => InteractionRes::StringRes(b"PONG".to_vec()),
+            MiscOps::Pong => ReturnValue::StringRes(b"PONG".to_vec()),
             MiscOps::FlushAll => {
                 state.kv.write().clear();
                 state.sets.write().clear();
                 state.lists.write().clear();
-                InteractionRes::Ok
+                ReturnValue::Ok
             }
-            MiscOps::Exists(keys) => InteractionRes::IntRes(
+            MiscOps::Exists(keys) => ReturnValue::IntRes(
                 keys.iter()
                     .map(|key| state.kv.read().contains_key(key))
                     .filter(|exists| *exists)
@@ -31,8 +31,9 @@ impl StateInteration for MiscOps {
                 let mut list_keys: Vec<Key> = state.lists.read().keys().cloned().collect();
                 kv_keys.append(&mut set_keys);
                 kv_keys.append(&mut list_keys);
-                InteractionRes::MultiStringRes(kv_keys)
+                ReturnValue::MultiStringRes(kv_keys)
             }
         }
+        .into()
     }
 }

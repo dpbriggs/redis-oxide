@@ -5,7 +5,7 @@ authors = ["David Briggs <email@dpbriggs.ca>"]
 edition = "2018"
 
 [dependencies]
-tokio = "0.1.18"
+tokio = "0.1.19"
 shlex = "0.1.1"
 promptly = "0.1.5"
 rand = "0.6.5"
@@ -14,7 +14,7 @@ bytes = "0.4.12"
 combine = "3.8.1"
 partial-io = { version = "0.3", features = ["tokio", "quickcheck"] }
 futures = "0.1.25"
-futures-locks = "0.3.3"
+# futures-locks = "0.3.3"
 sloggers = "0.3.2"
 lazy_static = "1.3.0"
 slog = "2.4.1"
