@@ -28,6 +28,7 @@ pub enum OpsError {
     WrongNumberOfArgs(usize, usize),
     InvalidType,
     SyntaxError,
+    InvalidArgs(String),
 }
 
 impl From<OpsError> for RedisValue {
@@ -49,6 +50,7 @@ impl From<OpsError> for RedisValue {
             OpsError::InvalidType => RedisValue::Error(b"Invalid Type!".to_vec()),
             OpsError::SyntaxError => RedisValue::Error(b"Syntax Error!".to_vec()),
             OpsError::Noop => RedisValue::Error(b"".to_vec()),
+            OpsError::InvalidArgs(s) => RedisValue::Error(s.as_bytes().to_vec()),
         }
     }
 }
@@ -169,6 +171,16 @@ fn tails_as_strings(tail: &[&RedisValue]) -> Result<Vec<Value>, OpsError> {
 fn verify_size_lower(v: &[&RedisValue], min_size: usize) -> Result<(), OpsError> {
     if v.len() < min_size {
         return Err(OpsError::NotEnoughArgs(min_size, v.len()));
+    }
+    Ok(())
+}
+
+fn verify_tail_even(tail: &[&RedisValue]) -> Result<(), OpsError> {
+    if (tail.len() - 1) % 2 != 0 {
+        return Err(OpsError::InvalidArgs(format!(
+            "Even number of args required! ({} given)",
+            tail.len() - 1
+        )));
     }
     Ok(())
 }
@@ -403,6 +415,19 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
             let value = Key::try_from(tail[2])?;
             Ok(Ops::Hashes(HashOps::HSet(key, field, value)))
         }
+        "hmset" => {
+            verify_size_lower(&tail, 3)?;
+            verify_tail_even(&tail)?;
+            let key = Key::try_from(tail[0])?;
+            let args = tails_as_strings(&tail[1..])?;
+            // TODO: Avoid cloning here
+            let mut key_value_tuples: Vec<(Key, Value)> = Vec::new();
+            for i in args.chunks(2) {
+                let key_value = (i[0].clone(), i[1].clone());
+                key_value_tuples.push(key_value);
+            }
+            Ok(Ops::Hashes(HashOps::HMSet(key, key_value_tuples)))
+        }
         "hexists" => {
             verify_size(&tail, 2)?;
             let key = Key::try_from(tail[0])?;
@@ -421,7 +446,18 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
             println!("{:?}", fields);
             Ok(Ops::Hashes(HashOps::HMGet(key, fields)))
         }
-
+        "hkeys" => {
+            verify_size(&tail, 1)?;
+            let key = Key::try_from(tail[0])?;
+            Ok(Ops::Hashes(HashOps::HKeys(key)))
+        }
+        // "hincrby" => {
+        //     verify_size(&tail, 3)?;
+        //     let key = Key::try_from(tail[0])?;
+        //     let field = Key::try_from(tail[1])?;
+        //     let value = Count::try_from(tail[2])?;
+        //     Ok(Ops::Hashes(HashOps::HIncrBy(key, field, value)))
+        // }
         _ => Err(OpsError::UnknownOp),
     }
 }

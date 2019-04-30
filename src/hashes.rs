@@ -1,4 +1,4 @@
-use crate::types::{InteractionRes, Key, ReturnValue, State, StateInteration, Value};
+use crate::types::{Count, InteractionRes, Key, ReturnValue, State, StateInteration, Value};
 
 #[derive(Debug, Clone)]
 pub enum HashOps {
@@ -8,6 +8,9 @@ pub enum HashOps {
     HExists(Key, Key),
     HGetAll(Key),
     HMGet(Key, Vec<Key>),
+    HKeys(Key),
+    HMSet(Key, Vec<(Key, Value)>),
+    // HIncrBy(Key, Key, Count),
 }
 
 macro_rules! read_hashes {
@@ -79,6 +82,28 @@ impl StateInteration for HashOps {
                     })
                     .collect(),
             }),
+            HashOps::HKeys(key) => match read_hashes!(state, &key) {
+                Some(hash) => {
+                    ReturnValue::Array(hash.keys().cloned().map(ReturnValue::StringRes).collect())
+                }
+                None => ReturnValue::Array(vec![]),
+            },
+            HashOps::HMSet(key, key_values) => {
+                state.create_hashes_if_necessary(&key);
+                write_hashes!(state, &key, hash);
+                hash.unwrap().extend(key_values);
+                ReturnValue::Ok
+            } // HashOps::HIncrBy(key, field, count) => {
+              //     // TODO
+              //     // state.create_hashes_if_necessary(&key);
+              //     // write_hashes!(state, &key, hashes);
+              //     // let hashes = hashes.unwrap();
+              //     // match hashes.get(&field) {
+              //     //     Some(hash) => hash,
+              //     //     None => 0
+              //     // }
+              //     ReturnValue::Ok
+              // }
         }
         .into()
     }

@@ -133,8 +133,7 @@ impl From<MyError> for std::io::Error {
             return e;
         }
         // TODO: Not do this, or even have this impl
-        println!("{:?}", err);
-        std::io::Error::new(std::io::ErrorKind::InvalidData, "oh no")
+        std::io::Error::new(std::io::ErrorKind::InvalidData, "IO Error")
     }
 }
 
