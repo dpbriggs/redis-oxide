@@ -11,6 +11,9 @@ pub enum HashOps {
     HKeys(Key),
     HMSet(Key, Vec<(Key, Value)>),
     // HIncrBy(Key, Key, Count),
+    HLen(Key),
+    HDel(Key, Vec<Key>),
+    HVals(Key),
 }
 
 macro_rules! read_hashes {
@@ -31,7 +34,7 @@ macro_rules! write_hashes {
         $state.hashes.write()
     };
     ($state:expr, $key:expr) => {
-        $state.hashes.write().get($key)
+        $state.hashes.write().get_mut($key)
     };
     ($state: expr, $key:expr, $var_name:ident) => {
         let mut __temp_name = $state.hashes.write();
@@ -94,16 +97,33 @@ impl StateInteration for HashOps {
                 hash.unwrap().extend(key_values);
                 ReturnValue::Ok
             } // HashOps::HIncrBy(key, field, count) => {
-              //     // TODO
-              //     // state.create_hashes_if_necessary(&key);
-              //     // write_hashes!(state, &key, hashes);
-              //     // let hashes = hashes.unwrap();
-              //     // match hashes.get(&field) {
-              //     //     Some(hash) => hash,
-              //     //     None => 0
-              //     // }
-              //     ReturnValue::Ok
-              // }
+            //     // TODO
+            //     // state.create_hashes_if_necessary(&key);
+            //     // write_hashes!(state, &key, hashes);
+            //     // let hashes = hashes.unwrap();
+            //     // match hashes.get(&field) {
+            //     //     Some(hash) => hash,
+            //     //     None => 0
+            //     // }
+            //     ReturnValue::Ok
+            // }
+            HashOps::HLen(key) => match read_hashes!(state, &key) {
+                Some(hash) => ReturnValue::IntRes(hash.len() as Count),
+                None => ReturnValue::IntRes(0),
+            },
+            HashOps::HDel(key, fields) => match write_hashes!(state, &key) {
+                Some(hash) => {
+                    let res = fields.iter().filter_map(|field| hash.remove(field)).count();
+                    ReturnValue::IntRes(res as Count)
+                }
+                None => ReturnValue::IntRes(0),
+            },
+            HashOps::HVals(key) => match read_hashes!(state, &key) {
+                Some(hash) => {
+                    ReturnValue::Array(hash.values().cloned().map(ReturnValue::StringRes).collect())
+                }
+                None => ReturnValue::Array(vec![]),
+            },
         }
         .into()
     }

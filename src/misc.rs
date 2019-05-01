@@ -17,6 +17,7 @@ impl StateInteration for MiscOps {
                 state.kv.write().clear();
                 state.sets.write().clear();
                 state.lists.write().clear();
+                state.hashes.write().clear();
                 ReturnValue::Ok
             }
             MiscOps::Exists(keys) => ReturnValue::IntRes(
