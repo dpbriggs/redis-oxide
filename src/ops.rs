@@ -443,13 +443,29 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
             verify_size_lower(&tail, 2)?;
             let key = Key::try_from(tail[0])?;
             let fields = tails_as_strings(&tail[1..])?;
-            println!("{:?}", fields);
+            // println!("{:?}", fields);
             Ok(Ops::Hashes(HashOps::HMGet(key, fields)))
         }
         "hkeys" => {
             verify_size(&tail, 1)?;
             let key = Key::try_from(tail[0])?;
             Ok(Ops::Hashes(HashOps::HKeys(key)))
+        }
+        "hlen" => {
+            verify_size(&tail, 1)?;
+            let key = Key::try_from(tail[0])?;
+            Ok(Ops::Hashes(HashOps::HLen(key)))
+        }
+        "hdel" => {
+            verify_size_lower(&tail, 2)?;
+            let key = Key::try_from(tail[0])?;
+            let fields = tails_as_strings(&tail[1..])?;
+            Ok(Ops::Hashes(HashOps::HDel(key, fields)))
+        }
+        "hvals" => {
+            verify_size(&tail, 1)?;
+            let key = Key::try_from(tail[0])?;
+            Ok(Ops::Hashes(HashOps::HVals(key)))
         }
         // "hincrby" => {
         //     verify_size(&tail, 3)?;
