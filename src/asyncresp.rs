@@ -112,27 +112,27 @@ parser! {
 }
 
 #[derive(Debug)]
-pub enum MyError {
+pub enum R02Error {
     IOError(std::io::Error),
     AddrParseError(String),
     Else(String),
 }
 
-impl From<std::net::AddrParseError> for MyError {
-    fn from(err: AddrParseError) -> MyError {
-        MyError::AddrParseError(err.to_string())
+impl From<std::net::AddrParseError> for R02Error {
+    fn from(err: AddrParseError) -> R02Error {
+        R02Error::AddrParseError(err.to_string())
     }
 }
 
-impl From<String> for MyError {
-    fn from(err: String) -> MyError {
-        MyError::Else(err)
+impl From<String> for R02Error {
+    fn from(err: String) -> R02Error {
+        R02Error::Else(err)
     }
 }
 
-impl From<MyError> for std::io::Error {
-    fn from(err: MyError) -> std::io::Error {
-        if let MyError::IOError(e) = err {
+impl From<R02Error> for std::io::Error {
+    fn from(err: R02Error) -> std::io::Error {
+        if let R02Error::IOError(e) = err {
             return e;
         }
         // TODO: Not do this, or even have this impl
@@ -140,9 +140,9 @@ impl From<MyError> for std::io::Error {
     }
 }
 
-impl From<io::Error> for MyError {
-    fn from(err: io::Error) -> MyError {
-        MyError::IOError(err)
+impl From<io::Error> for R02Error {
+    fn from(err: io::Error) -> R02Error {
+        R02Error::IOError(err)
     }
 }
 
@@ -153,7 +153,7 @@ pub struct RedisValueCodec {
 
 impl Decoder for RedisValueCodec {
     type Item = RedisValue;
-    type Error = MyError;
+    type Error = R02Error;
     fn decode(&mut self, bytes: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         let (opt, removed_len) = {
             let buffer = &bytes[..];
@@ -165,7 +165,7 @@ impl Decoder for RedisValueCodec {
                         .map_position(|pos| pos.translate_position(buffer))
                         .map_range(|range| format!("{:?}", range))
                         .to_string();
-                    return Err(MyError::Else(err));
+                    return Err(R02Error::Else(err));
                 }
             }
         };

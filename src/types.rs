@@ -1,4 +1,4 @@
-// use futures::future::Future;
+/// Common Types in the project.
 use parking_lot::RwLock;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::convert::From;
@@ -14,12 +14,15 @@ pub type Value = Vec<u8>;
 pub type Key = Vec<u8>;
 /// Count is used for commands that count.
 pub type Count = i64;
+/// Index is used to represent indices in structures.
 pub type Index = i64;
 
 /// DumpFile type alias.
 pub type DumpFile = Arc<Mutex<File>>;
 
-#[allow(dead_code)]
+/// RedisValue is the canonical type for values flowing
+/// through the system. Inputs are converted into RedisValues,
+/// and outputs are converted into RedisValues.
 #[derive(Debug, PartialEq, Clone)]
 pub enum RedisValue {
     SimpleString(Value),
@@ -31,10 +34,12 @@ pub enum RedisValue {
     NullBulkString,
 }
 
+/// Special constants in the RESP protocol.
 pub const NULL_BULK_STRING: &str = "$-1\r\n";
 pub const NULL_ARRAY: &str = "*-1\r\n";
 pub const EMPTY_ARRAY: &str = "*0\r\n";
 
+/// Convenience type for returns value. Maps directly to RedisValues.
 #[derive(Debug, PartialEq)]
 pub enum ReturnValue {
     Ok,
@@ -49,12 +54,14 @@ pub enum ReturnValue {
     // FutureResValue(Box<Future<Item = (), Error = ()> + Send>),
 }
 
+/// Convenience trait to convert ReturnValues to InteractionRes.
 impl From<ReturnValue> for InteractionRes {
     fn from(int: ReturnValue) -> InteractionRes {
         InteractionRes::Immediate(int)
     }
 }
 
+/// Highest level output type. This is the return value returned by operations.
 pub enum InteractionRes {
     Immediate(ReturnValue),
     #[allow(dead_code)]
@@ -62,6 +69,7 @@ pub enum InteractionRes {
     Blocking(Box<Future<Item = ReturnValue, Error = ()> + Send>),
 }
 
+/// Debug impl for InteractionRes; used by debug logs.
 impl std::fmt::Debug for InteractionRes {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
@@ -74,6 +82,7 @@ impl std::fmt::Debug for InteractionRes {
     }
 }
 
+/// Convenience method to determine an error. Used in testing.
 impl ReturnValue {
     pub fn is_error(&self) -> bool {
         if let ReturnValue::Error(_) = *self {
@@ -102,28 +111,26 @@ pub struct State {
     pub hashes: Arc<RwLock<KeyHash>>,
 }
 
+/// Mapping of a ReturnValue to a RedisValue.
 impl From<ReturnValue> for RedisValue {
     fn from(state_res: ReturnValue) -> Self {
         match state_res {
             ReturnValue::Ok => RedisValue::SimpleString(vec![b'O', b'K']),
             ReturnValue::Nil => RedisValue::NullBulkString,
             ReturnValue::StringRes(s) => RedisValue::BulkString(s),
-            ReturnValue::MultiStringRes(a) => RedisValue::Array(
-                a.into_iter()
-                    .map(RedisValue::BulkString)
-                    .collect(),
-            ),
+            ReturnValue::MultiStringRes(a) => {
+                RedisValue::Array(a.into_iter().map(RedisValue::BulkString).collect())
+            }
             ReturnValue::IntRes(i) => RedisValue::Int(i as i64),
             ReturnValue::Error(e) => RedisValue::Error(e.to_vec()),
             ReturnValue::Array(a) => {
                 RedisValue::Array(a.into_iter().map(RedisValue::from).collect())
             }
-            // ReturnValue::FutureRes(s, _) => RedisValue::from(*s),
-            // ReturnValue::FutureResValue(_) => unreachable!(),
         }
     }
 }
 
+/// StateInteration is how Operations interact with State.
 pub trait StateInteration {
     fn interact(self, state: State) -> InteractionRes;
 }

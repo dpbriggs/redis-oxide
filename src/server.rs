@@ -1,6 +1,7 @@
+/// Server launch file. Starts the services to make redis-oxide work.
 use std::env;
 
-use crate::asyncresp::{MyError, RedisValueCodec};
+use crate::asyncresp::{R02Error, RedisValueCodec};
 use crate::database::save_state;
 use crate::logger::LOGGER;
 use crate::{
@@ -13,6 +14,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::*;
 use tokio_codec::Decoder;
 
+/// Process a single socket; one of these tasks per tcp accept.
 fn process(socket: TcpStream, state: State) {
     let (tx, rx) = RedisValueCodec::default().framed(socket).split();
     // Map all requests into responses and send them back to the client.
@@ -42,7 +44,7 @@ fn process(socket: TcpStream, state: State) {
         }))
         .then(|res| {
             if let Err(e) = res {
-                println!("failed to process connection; error = {:?}", e);
+                warn!(LOGGER, "failed to process connection; error = {:?}", e);
             }
 
             Ok(())
@@ -50,6 +52,7 @@ fn process(socket: TcpStream, state: State) {
     tokio::spawn(task);
 }
 
+/// The listener for redis-oxide. Accepts connections and spawns handlers.
 fn socket_listener(state: State) -> impl Future<Item = (), Error = ()> {
     // and set up our redis server.
     let addr = env::args()
@@ -69,9 +72,9 @@ fn socket_listener(state: State) -> impl Future<Item = (), Error = ()> {
         .map_err(|e| panic!("Failed to start server! error = {:?}", e))
 }
 
-pub fn server(state: State, dump_file: DumpFile) -> Result<(), MyError> {
-    // Parse the address we're going to run this server on
-    // tokio::spawn(save_state(state.clone()));
+/// Start the redis-oxide server.
+/// Spawns the socket listener and the state saving service.
+pub fn server(state: State, dump_file: DumpFile) -> Result<(), R02Error> {
     tokio::run(lazy(move || {
         tokio::spawn(save_state(state.clone(), dump_file));
         tokio::spawn(socket_listener(state.clone()));
