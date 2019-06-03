@@ -1,5 +1,4 @@
 // use rand::Rng;
-use crate::ops::Ops;
 use crate::types::StateInteration;
 use crate::types::{InteractionRes, ReturnValue, State};
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -23,13 +22,6 @@ impl fmt::Display for ReturnValue {
 }
 
 impl State {
-    // pub fn load(dump_data: &[u8]) -> State {
-    //     let database = deserialize::<Database>(dump_data).unwrap();
-    //     let kv = deserialize::<KeyString>(&database.kv);
-    //     println!("{:?}", kv);
-    //     State::default()
-    // }
-
     pub fn create_list_if_necessary(&self, list_key: &[u8]) {
         if !self.lists.read().contains_key(list_key) {
             self.lists
@@ -52,13 +44,7 @@ impl State {
         }
     }
 
-    pub fn interact(self, action: Ops) -> InteractionRes {
-        match action {
-            Ops::Keys(key_op) => key_op.interact(self),
-            Ops::Lists(list_op) => list_op.interact(self),
-            Ops::Misc(misc_op) => misc_op.interact(self),
-            Ops::Sets(set_op) => set_op.interact(self),
-            Ops::Hashes(hash_op) => hash_op.interact(self),
-        }
+    pub fn exec_op<T: StateInteration>(self, action: T) -> InteractionRes {
+        action.interact(self)
     }
 }

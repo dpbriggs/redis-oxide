@@ -17,6 +17,7 @@ use combine::parser::choice::choice;
 use combine::range::{recognize, take};
 use combine::stream::{FullRangeStream, StreamErrorFor};
 
+// Dummy tuple struct to impl Extend/Default on
 struct ResultExtend<T, E>(Result<T, E>);
 
 impl<T, E> Default for ResultExtend<T, E>
@@ -28,6 +29,8 @@ where
     }
 }
 
+/// Trait to allow us to grab more bytes if we're still Ok::<U>,
+/// Or just keep an error and set self to it.
 impl<T, U, E> Extend<Result<U, E>> for ResultExtend<T, E>
 where
     T: Extend<U>,

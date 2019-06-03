@@ -5,6 +5,7 @@ use crate::keys::KeyOps;
 use crate::lists::ListOps;
 use crate::misc::MiscOps;
 use crate::sets::SetOps;
+use crate::types::{InteractionRes, State, StateInteration};
 
 use crate::types::{
     Count, Index, Key, RedisValue, Value, EMPTY_ARRAY, NULL_ARRAY, NULL_BULK_STRING,
@@ -17,6 +18,18 @@ pub enum Ops {
     Lists(ListOps),
     Misc(MiscOps),
     Hashes(HashOps),
+}
+
+impl StateInteration for Ops {
+    fn interact(self, state: State) -> InteractionRes {
+        match self {
+            Ops::Keys(op) => op.interact(state),
+            Ops::Sets(op) => op.interact(state),
+            Ops::Lists(op) => op.interact(state),
+            Ops::Misc(op) => op.interact(state),
+            Ops::Hashes(op) => op.interact(state),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -211,6 +224,26 @@ fn get_key_and_tail(array: &[RedisValue]) -> Result<(Key, Vec<Value>), OpsError>
     Ok((set_key, vals))
 }
 
+/// Convenience macro to automatically construct the right variant
+/// of Ops.
+macro_rules! ok {
+    (KeyOps::$OpName:ident($($OpArg:expr),*)) => {
+        Ok(Ops::Keys(KeyOps::$OpName($( $OpArg ),*)))
+    };
+    (MiscOps::$OpName:ident($($OpArg:expr),*)) => {
+        Ok(Ops::Misc(MiscOps::$OpName($( $OpArg ),*)))
+    };
+    (SetOps::$OpName:ident($($OpArg:expr),*)) => {
+        Ok(Ops::Sets(SetOps::$OpName($( $OpArg ),*)))
+    };
+    (HashOps::$OpName:ident($($OpArg:expr),*)) => {
+        Ok(Ops::Hashes(HashOps::$OpName($( $OpArg ),*)))
+    };
+    (ListOps::$OpName:ident($($OpArg:expr),*)) => {
+        Ok(Ops::Lists(ListOps::$OpName($( $OpArg ),*)))
+    };
+}
+
 fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
     if array.is_empty() {
         return Err(OpsError::Noop);
@@ -225,75 +258,74 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
         // Key-Value
         "set" => {
             let (key, val) = get_key_and_val(array)?;
-            Ok(Ops::Keys(KeyOps::Set(key, val)))
-            // Ok(Ops::Keys(KeyOp::Set(key, val)))
+            ok!(KeyOps::Set(key, val))
         }
         "get" => {
             verify_size(&tail, 1)?;
             let key = Key::try_from(tail[0])?;
-            Ok(Ops::Keys(KeyOps::Get(key)))
+            ok!(KeyOps::Get(key))
         }
         "del" => {
             verify_size_lower(&tail, 1)?;
             let keys = tails_as_strings(&tail)?;
-            Ok(Ops::Keys(KeyOps::Del(keys)))
+            ok!(KeyOps::Del(keys))
         }
         "rename" => {
             verify_size(&tail, 2)?;
             let key = Key::try_from(tail[0])?;
             let new_key = Key::try_from(tail[1])?;
-            Ok(Ops::Keys(KeyOps::Rename(key, new_key)))
+            ok!(KeyOps::Rename(key, new_key))
         }
         "exists" => {
             verify_size_lower(&tail, 1)?;
             let keys = tails_as_strings(&tail)?;
-            Ok(Ops::Misc(MiscOps::Exists(keys)))
+            ok!(MiscOps::Exists(keys))
         }
         // Sets
         "sadd" => {
             let (set_key, vals) = get_key_and_tail(array)?;
-            Ok(Ops::Sets(SetOps::SAdd(set_key, vals)))
+            ok!(SetOps::SAdd(set_key, vals))
         }
         "srem" => {
             let (set_key, vals) = get_key_and_tail(array)?;
-            Ok(Ops::Sets(SetOps::SRem(set_key, vals)))
+            ok!(SetOps::SRem(set_key, vals))
         }
         "smembers" => {
             verify_size(&tail, 1)?;
             let set_key = Key::try_from(tail[0])?;
-            Ok(Ops::Sets(SetOps::SMembers(set_key)))
+            ok!(SetOps::SMembers(set_key))
         }
         "scard" => {
             verify_size(&tail, 1)?;
             let key = Key::try_from(tail[0])?;
-            Ok(Ops::Sets(SetOps::SCard(key)))
+            ok!(SetOps::SCard(key))
         }
         "sdiff" => {
             verify_size_lower(&tail, 2)?;
             let keys = tails_as_strings(&tail)?;
-            Ok(Ops::Sets(SetOps::SDiff(keys)))
+            ok!(SetOps::SDiff(keys))
         }
         "sunion" => {
             verify_size_lower(&tail, 2)?;
             let keys = tails_as_strings(&tail)?;
-            Ok(Ops::Sets(SetOps::SUnion(keys)))
+            ok!(SetOps::SUnion(keys))
         }
         "sinter" => {
             verify_size_lower(&tail, 2)?;
             let keys = tails_as_strings(&tail)?;
-            Ok(Ops::Sets(SetOps::SInter(keys)))
+            ok!(SetOps::SInter(keys))
         }
         "sdiffstore" => {
             let (set_key, sets) = get_key_and_tail(array)?;
-            Ok(Ops::Sets(SetOps::SDiffStore(set_key, sets)))
+            ok!(SetOps::SDiffStore(set_key, sets))
         }
         "sunionstore" => {
             let (set_key, sets) = get_key_and_tail(array)?;
-            Ok(Ops::Sets(SetOps::SUnionStore(set_key, sets)))
+            ok!(SetOps::SUnionStore(set_key, sets))
         }
         "sinterstore" => {
             let (set_key, sets) = get_key_and_tail(array)?;
-            Ok(Ops::Sets(SetOps::SInterStore(set_key, sets)))
+            ok!(SetOps::SInterStore(set_key, sets))
         }
         "spop" => {
             verify_size_lower(&tail, 1)?;
@@ -302,18 +334,18 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
                 Some(c) => Some(Count::try_from(*c)?),
                 None => None,
             };
-            Ok(Ops::Sets(SetOps::SPop(key, count)))
+            ok!(SetOps::SPop(key, count))
         }
         "sismember" => {
             let (key, member) = get_key_and_val(array)?;
-            Ok(Ops::Sets(SetOps::SIsMember(key, member)))
+            ok!(SetOps::SIsMember(key, member))
         }
         "smove" => {
             verify_size(&tail, 3)?;
             let src = Key::try_from(tail[0])?;
             let dest = Key::try_from(tail[1])?;
             let member = Value::try_from(tail[2])?;
-            Ok(Ops::Sets(SetOps::SMove(src, dest, member)))
+            ok!(SetOps::SMove(src, dest, member))
         }
         "srandmember" => {
             verify_size_lower(&tail, 1)?;
@@ -322,98 +354,98 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
                 Some(c) => Some(Count::try_from(*c)?),
                 None => None,
             };
-            Ok(Ops::Sets(SetOps::SRandMembers(key, count)))
+            ok!(SetOps::SRandMembers(key, count))
         }
         "lpush" => {
             let (key, vals) = get_key_and_tail(array)?;
-            Ok(Ops::Lists(ListOps::LPush(key, vals)))
+            ok!(ListOps::LPush(key, vals))
         }
         "rpush" => {
             let (key, vals) = get_key_and_tail(array)?;
-            Ok(Ops::Lists(ListOps::RPush(key, vals)))
+            ok!(ListOps::RPush(key, vals))
         }
         "lpushx" => {
             verify_size(&tail, 2)?;
             let key = Key::try_from(tail[0])?;
             let val = Value::try_from(tail[1])?;
-            Ok(Ops::Lists(ListOps::LPushX(key, val)))
+            ok!(ListOps::LPushX(key, val))
         }
         "rpushx" => {
             verify_size(&tail, 2)?;
             let key = Key::try_from(tail[0])?;
             let val = Value::try_from(tail[1])?;
-            Ok(Ops::Lists(ListOps::RPushX(key, val)))
+            ok!(ListOps::RPushX(key, val))
         }
         "llen" => {
             verify_size(&tail, 1)?;
             let key = Key::try_from(tail[0])?;
-            Ok(Ops::Lists(ListOps::LLen(key)))
+            ok!(ListOps::LLen(key))
         }
         "lpop" => {
             verify_size(&tail, 1)?;
             let key = Key::try_from(tail[0])?;
-            Ok(Ops::Lists(ListOps::LPop(key)))
+            ok!(ListOps::LPop(key))
         }
         "blpop" => {
             verify_size(&tail, 1)?;
             let key = Key::try_from(tail[0])?;
-            Ok(Ops::Lists(ListOps::BLPop(key)))
+            ok!(ListOps::BLPop(key))
         }
         "rpop" => {
             verify_size(&tail, 1)?;
             let key = Key::try_from(tail[0])?;
-            Ok(Ops::Lists(ListOps::RPop(key)))
+            ok!(ListOps::RPop(key))
         }
         "linsert" => {
             verify_size(&tail, 1)?;
             let key = Key::try_from(tail[0])?;
-            Ok(Ops::Lists(ListOps::LPop(key)))
+            ok!(ListOps::LPop(key))
         }
         "lindex" => {
             verify_size(&tail, 2)?;
             let key = Key::try_from(tail[0])?;
             let index = Index::try_from(tail[1])?;
-            Ok(Ops::Lists(ListOps::LIndex(key, index)))
+            ok!(ListOps::LIndex(key, index))
         }
         "lset" => {
             verify_size(&tail, 3)?;
             let key = Key::try_from(tail[0])?;
             let index = Index::try_from(tail[1])?;
             let value = Value::try_from(tail[2])?;
-            Ok(Ops::Lists(ListOps::LSet(key, index, value)))
+            ok!(ListOps::LSet(key, index, value))
         }
         "lrange" => {
             verify_size(&tail, 3)?;
             let key = Key::try_from(tail[0])?;
             let start_index = Index::try_from(tail[1])?;
             let end_index = Index::try_from(tail[2])?;
-            Ok(Ops::Lists(ListOps::LRange(key, start_index, end_index)))
+            ok!(ListOps::LRange(key, start_index, end_index))
         }
         "ltrim" => {
             verify_size(&tail, 3)?;
             let key = Key::try_from(tail[0])?;
             let start_index = Index::try_from(tail[1])?;
             let end_index = Index::try_from(tail[2])?;
-            Ok(Ops::Lists(ListOps::LTrim(key, start_index, end_index)))
+            ok!(ListOps::LTrim(key, start_index, end_index))
         }
         "rpoplpush" => {
             verify_size(&tail, 2)?;
             let source = Key::try_from(tail[0])?;
             let dest = Key::try_from(tail[1])?;
-            Ok(Ops::Lists(ListOps::RPopLPush(source, dest)))
+            ok!(ListOps::RPopLPush(source, dest))
         }
         "hget" => {
             verify_size(&tail, 2)?;
             let key = Key::try_from(tail[0])?;
             let field = Key::try_from(tail[1])?;
-            Ok(Ops::Hashes(HashOps::HGet(key, field)))
+            ok!(HashOps::HGet(key, field))
         }
         "hset" => {
             verify_size(&tail, 3)?;
             let key = Key::try_from(tail[0])?;
             let field = Key::try_from(tail[1])?;
             let value = Key::try_from(tail[2])?;
-            Ok(Ops::Hashes(HashOps::HSet(key, field, value)))
+            ok!(HashOps::HSet(key, field, value))
         }
         "hmset" => {
             verify_size_lower(&tail, 3)?;
@@ -426,46 +458,45 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
                 let key_value = (i[0].clone(), i[1].clone());
                 key_value_tuples.push(key_value);
             }
-            Ok(Ops::Hashes(HashOps::HMSet(key, key_value_tuples)))
+            ok!(HashOps::HMSet(key, key_value_tuples))
         }
         "hexists" => {
             verify_size(&tail, 2)?;
             let key = Key::try_from(tail[0])?;
             let field = Key::try_from(tail[1])?;
-            Ok(Ops::Hashes(HashOps::HExists(key, field)))
+            ok!(HashOps::HExists(key, field))
         }
         "hgetall" => {
             verify_size(&tail, 1)?;
             let key = Key::try_from(tail[0])?;
-            Ok(Ops::Hashes(HashOps::HGetAll(key)))
+            ok!(HashOps::HGetAll(key))
         }
         "hmget" => {
             verify_size_lower(&tail, 2)?;
             let key = Key::try_from(tail[0])?;
             let fields = tails_as_strings(&tail[1..])?;
-            // println!("{:?}", fields);
-            Ok(Ops::Hashes(HashOps::HMGet(key, fields)))
+            ok!(HashOps::HMGet(key, fields))
         }
         "hkeys" => {
             verify_size(&tail, 1)?;
             let key = Key::try_from(tail[0])?;
-            Ok(Ops::Hashes(HashOps::HKeys(key)))
+            ok!(HashOps::HKeys(key))
         }
         "hlen" => {
             verify_size(&tail, 1)?;
             let key = Key::try_from(tail[0])?;
-            Ok(Ops::Hashes(HashOps::HLen(key)))
+            ok!(HashOps::HLen(key))
         }
         "hdel" => {
             verify_size_lower(&tail, 2)?;
             let key = Key::try_from(tail[0])?;
             let fields = tails_as_strings(&tail[1..])?;
-            Ok(Ops::Hashes(HashOps::HDel(key, fields)))
+            ok!(HashOps::HDel(key, fields))
         }
         "hvals" => {
             verify_size(&tail, 1)?;
             let key = Key::try_from(tail[0])?;
-            Ok(Ops::Hashes(HashOps::HVals(key)))
+            ok!(HashOps::HVals(key))
         }
         // "hincrby" => {
         //     verify_size(&tail, 3)?;

@@ -16,6 +16,7 @@ pub type Key = Vec<u8>;
 pub type Count = i64;
 pub type Index = i64;
 
+/// DumpFile type alias.
 pub type DumpFile = Arc<Mutex<File>>;
 
 #[allow(dead_code)]
@@ -56,6 +57,7 @@ impl From<ReturnValue> for InteractionRes {
 
 pub enum InteractionRes {
     Immediate(ReturnValue),
+    #[allow(dead_code)]
     ImmediateWithWork(ReturnValue, Box<Future<Item = (), Error = ()> + Send>),
     Blocking(Box<Future<Item = ReturnValue, Error = ()> + Send>),
 }

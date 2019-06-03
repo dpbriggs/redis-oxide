@@ -21,7 +21,7 @@ fn process(socket: TcpStream, state: State) {
         .send_all(rx.and_then(move |r: RedisValue| match translate(&r) {
             Ok(op) => {
                 debug!(LOGGER, "running op {:?}", op.clone());
-                let res = state.clone().interact(op);
+                let res = state.clone().exec_op(op);
                 match res {
                     InteractionRes::Immediate(r) => Ok(RedisValue::from(r)),
                     InteractionRes::ImmediateWithWork(r, w) => {

@@ -21,6 +21,7 @@ use tokio::timer::Interval;
 
 const SAVE_STATE_PERIOD: u64 = 60 * 100;
 
+/// Convenience macro to panic with error messages.
 macro_rules! fatal_panic {
     ($msg:expr) => {{
         error!(LOGGER, "{}", $msg);
@@ -34,6 +35,7 @@ macro_rules! fatal_panic {
     }};
 }
 
+/// Convenience macro to deserialize parts of State.
 macro_rules! from_bytes {
     ($bytez:expr) => {{
         let de = Deserialize::deserialize(&mut Deserializer::new(&$bytez[..]));
@@ -46,6 +48,7 @@ macro_rules! from_bytes {
     }};
 }
 
+/// Convenience macro to serialize parts of State
 macro_rules! to_bytes {
     ($item:expr) => {{
         let mut buf = Vec::new();
@@ -56,6 +59,7 @@ macro_rules! to_bytes {
     }};
 }
 
+/// Trait to create a State from a Database instance (i.e. load from dump_file)
 impl From<Database> for State {
     fn from(db: Database) -> State {
         State {
@@ -67,6 +71,7 @@ impl From<Database> for State {
     }
 }
 
+/// Dump the current state to the dump_file
 fn dump_state(state: &State, dump_file: &mut File) -> Result<(), Box<Error>> {
     let db = Database {
         kv: to_bytes!(*state.kv.read()),
@@ -81,6 +86,7 @@ fn dump_state(state: &State, dump_file: &mut File) -> Result<(), Box<Error>> {
     Ok(())
 }
 
+/// Load state from the dump_file
 pub fn load_state(dump_file: DumpFile) -> Result<State, Box<Error>> {
     let mut contents = dump_file.lock();
     if contents.metadata()?.len() == 0 {
@@ -93,6 +99,7 @@ pub fn load_state(dump_file: DumpFile) -> Result<State, Box<Error>> {
     Ok(State::from(database))
 }
 
+/// Make the data directory (directory where the dump file lives)
 fn make_data_dir(data_dir: &Path) {
     match std::fs::create_dir_all(&data_dir) {
         Ok(_) => {
@@ -113,6 +120,9 @@ fn make_data_dir(data_dir: &Path) {
     }
 }
 
+/// Get the dump file
+///
+/// Panics if a data directory cannot be found, or file cannot be opened.
 pub fn get_dump_file(config: &Config) -> DumpFile {
     let data_dir: PathBuf = match &config.data_dir {
         Some(dir) => dir.to_path_buf(),
@@ -144,6 +154,9 @@ pub fn get_dump_file(config: &Config) -> DumpFile {
     Arc::new(Mutex::new(opened_file))
 }
 
+/// Save the current State to Dumpfile.
+///
+/// Panics if state fails to dump.
 pub fn save_state(state: State, dump_file: DumpFile) -> impl Future<Item = (), Error = ()> {
     let dump_file_clone = dump_file.clone();
     Interval::new(Instant::now(), Duration::from_millis(SAVE_STATE_PERIOD))
@@ -152,26 +165,15 @@ pub fn save_state(state: State, dump_file: DumpFile) -> impl Future<Item = (), E
             info!(LOGGER, "Saving state...");
             match dump_file_clone.try_lock() {
                 Some(mut file) => {
-                    file.set_len(0).unwrap();
                     if let Err(e) = dump_state(&state, &mut file) {
                         fatal_panic!("FAILED TO DUMP STATE!", e.description());
                     }
-                    // let current_state = match dump_state(&state, file) {
-                    //     Ok(state) => state,
-                    //     Err(e) => {
-                    //         let err_msg = format!("FAILED TO SAVE STATE IN DUMP FILE! {:?}", e);
-                    //         fatal_panic!(err_msg);
-                    //     }
-                    // };
-                    // file.write_all(&current_state)
-                    //     .expect("Failed to write to file!");
                 }
                 None => info!(
                     LOGGER,
                     "Failed to save state! Someone else is currently writing..."
                 ),
             };
-            // debug!(LOGGER, "state: {:?}", current_state);
             Ok(())
         })
         .map_err(|e| error!(LOGGER, "save state failed; err={:?}", e))

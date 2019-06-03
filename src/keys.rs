@@ -93,31 +93,31 @@ mod test_keys {
         #[test]
         fn test_get(v: Value) {
             let eng = State::default();
-            assert_eq(ir(ReturnValue::Nil), eng.clone().interact(gp(KeyOps::Get(v.clone()))));
-            eng.clone().interact(gp(KeyOps::Set(v.clone(), v.clone())));
-            assert_eq(ir(ReturnValue::StringRes(v.clone())), eng.interact(gp(KeyOps::Get(v.clone()))));
+            assert_eq(ir(ReturnValue::Nil), eng.clone().exec_op(gp(KeyOps::Get(v.clone()))));
+            eng.clone().exec_op(gp(KeyOps::Set(v.clone(), v.clone())));
+            assert_eq(ir(ReturnValue::StringRes(v.clone())), eng.exec_op(gp(KeyOps::Get(v.clone()))));
         }
         #[test]
         fn test_set(l: Value, r: Value) {
             let eng = State::default();
-            eng.clone().interact(gp(KeyOps::Set(l.clone(), r.clone())));
-            assert_eq(ir(ReturnValue::StringRes(r.clone())), eng.interact(gp(KeyOps::Get(l.clone()))));
+            eng.clone().exec_op(gp(KeyOps::Set(l.clone(), r.clone())));
+            assert_eq(ir(ReturnValue::StringRes(r.clone())), eng.exec_op(gp(KeyOps::Get(l.clone()))));
         }
         #[test]
         fn test_del(l: Value, unused: Value) {
             let eng = State::default();
-            eng.clone().interact(gp(KeyOps::Set(l.clone(), l.clone())));
-            assert_eq(ir(ReturnValue::IntRes(1)), eng.clone().interact(gp(KeyOps::Del(vec![l.clone()]))));
-            assert_eq(ir(ReturnValue::IntRes(0)), eng.interact(gp(KeyOps::Del(vec![unused]))));
+            eng.clone().exec_op(gp(KeyOps::Set(l.clone(), l.clone())));
+            assert_eq(ir(ReturnValue::IntRes(1)), eng.clone().exec_op(gp(KeyOps::Del(vec![l.clone()]))));
+            assert_eq(ir(ReturnValue::IntRes(0)), eng.exec_op(gp(KeyOps::Del(vec![unused]))));
         }
         #[test]
         fn test_rename(old: Value, v: Value, new: Value) {
             let eng = State::default();
-            eng.clone().interact(gp(KeyOps::Set(old.clone(), v.clone())));
-            // TODO: Make testing InteractionRes tractable
-            // assert(ir(eng.clone().interact(gp(KeyOps::Rename(new.clone()), old.clone()))).is_error());
-            eng.clone().interact(gp(KeyOps::Rename(old.clone(), new.clone())));
-            assert_eq(ir(ReturnValue::StringRes(v.clone())), eng.clone().interact(gp(KeyOps::Get(new))));
+            eng.clone().exec_op(gp(KeyOps::Set(old.clone(), v.clone())));
+            // TODO: Make testing Exec_OpionRes tractable
+            // assert(ir(eng.clone().exec_op(gp(KeyOps::Rename(new.clone()), old.clone()))).is_error());
+            eng.clone().exec_op(gp(KeyOps::Rename(old.clone(), new.clone())));
+            assert_eq(ir(ReturnValue::StringRes(v.clone())), eng.clone().exec_op(gp(KeyOps::Get(new))));
         }
     }
 }
