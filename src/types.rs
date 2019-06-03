@@ -83,25 +83,23 @@ impl ReturnValue {
     }
 }
 
+/// Canonical type for Key-Value storage.
 type KeyString = HashMap<Key, Value>;
+/// Canonical type for Key-Set storage.
 type KeySet = HashMap<Key, HashSet<Value>>;
+/// Canonical type for Key-List storage.
 type KeyList = HashMap<Key, VecDeque<Value>>;
+/// Canonical type for Key-Hash storage.
 type KeyHash = HashMap<Key, HashMap<Key, Value>>;
 
-#[derive(Default, Debug, Clone)]
+/// The state stored by redis-oxide. These fields are the ones
+/// used by the various datastructure files (keys.rs, etc)
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct State {
     pub kv: Arc<RwLock<KeyString>>,
     pub sets: Arc<RwLock<KeySet>>,
     pub lists: Arc<RwLock<KeyList>>,
     pub hashes: Arc<RwLock<KeyHash>>,
-}
-
-#[derive(Debug, Default, Serialize, Deserialize)]
-pub struct Database {
-    pub kv: Vec<u8>,
-    pub sets: Vec<u8>,
-    pub lists: Vec<u8>,
-    pub hashes: Vec<u8>,
 }
 
 impl From<ReturnValue> for RedisValue {

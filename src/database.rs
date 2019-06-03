@@ -1,12 +1,8 @@
 use crate::logger::LOGGER;
 use crate::startup::Config;
-use crate::types::{Database, DumpFile, State};
+use crate::types::{DumpFile, State};
 use directories::ProjectDirs;
 use parking_lot::Mutex;
-use parking_lot::RwLock;
-use rmps::{Deserializer, Serializer};
-use serde::{Deserialize, Serialize};
-use std::convert::From;
 use std::error::Error;
 use std::fs::File;
 use std::fs::OpenOptions;
@@ -35,52 +31,10 @@ macro_rules! fatal_panic {
     }};
 }
 
-/// Convenience macro to deserialize parts of State.
-macro_rules! from_bytes {
-    ($bytez:expr) => {{
-        let de = Deserialize::deserialize(&mut Deserializer::new(&$bytez[..]));
-        let des_atmp = match de {
-            Ok(da) => da,
-            Err(_) if $bytez.len() == 0 => Default::default(),
-            Err(e) => fatal_panic!("failed to deserialize! {}", e.description()),
-        };
-        Arc::new(RwLock::new(des_atmp))
-    }};
-}
-
-/// Convenience macro to serialize parts of State
-macro_rules! to_bytes {
-    ($item:expr) => {{
-        let mut buf = Vec::new();
-        $item
-            .serialize(&mut Serializer::new(&mut buf))
-            .and_then(|_| Ok(buf))
-            .unwrap()
-    }};
-}
-
-/// Trait to create a State from a Database instance (i.e. load from dump_file)
-impl From<Database> for State {
-    fn from(db: Database) -> State {
-        State {
-            kv: from_bytes!(db.kv),
-            sets: from_bytes!(db.sets),
-            lists: from_bytes!(db.lists),
-            hashes: from_bytes!(db.hashes),
-        }
-    }
-}
-
 /// Dump the current state to the dump_file
 fn dump_state(state: &State, dump_file: &mut File) -> Result<(), Box<Error>> {
-    let db = Database {
-        kv: to_bytes!(*state.kv.read()),
-        sets: to_bytes!(&*state.sets.read()),
-        lists: to_bytes!(&*state.lists.read()),
-        hashes: to_bytes!(&*state.hashes.read()),
-    };
     dump_file.seek(SeekFrom::Start(0))?;
-    rmps::encode::write(dump_file, &db)
+    rmps::encode::write(dump_file, &state)
         .map_err(|e| fatal_panic!("Could not write state!", e.description()))
         .unwrap();
     Ok(())
@@ -94,9 +48,9 @@ pub fn load_state(dump_file: DumpFile) -> Result<State, Box<Error>> {
     }
 
     contents.seek(SeekFrom::Start(0))?;
-    let database: Database = rmps::decode::from_read(&*contents)?;
+    let state: State = rmps::decode::from_read(&*contents)?;
 
-    Ok(State::from(database))
+    Ok(state)
 }
 
 /// Make the data directory (directory where the dump file lives)
