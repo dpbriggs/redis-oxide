@@ -104,7 +104,7 @@ We should solidify the above before working on the more complex bits, but contri
 
 Conduct: =Have fun, please don't be a jerk.=
 
-Contact: Make an issue or PR against this repo, or send an email to =email@dpbriggs.ca=. If you know of a better forum, please suggest it!
+Contact: Make an issue or PR against this repo, or send an email to =david@dpbriggs.ca=. If you know of a better forum, please suggest it!
 
 NOTE: *DO NOT USE THE REDIS SOURCE CODE IN ANY WAY!*
 
@@ -116,6 +116,7 @@ The general design of =redis-oxide= is:
   - The parser generates a =RedisValue=, which is the lingua franca of =redis-oxide=.
 - This gets converted to an =Ops::XYZ(XYZOps::Foobar(..))= enum object, which implements the =StateInteration= trait.
   - This nested enum is a dirty way to get static dispatch and hacky-polymorphism. If you can find a nice generic way to represent this, please let me know!
+  - A macro eases the pain of this.
 - This operation is executed against the global =State= object (using the =StateInteraction= trait).
   - This will return an =ReturnValue= type, which is a more convenient form of =RedisValue=.
   - This =ReturnValue= is converted and sent back to the client.

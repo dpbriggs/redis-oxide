@@ -2,6 +2,7 @@
 use parking_lot::RwLock;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::convert::From;
+use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use tokio::prelude::*;
 
@@ -65,8 +66,8 @@ impl From<ReturnValue> for InteractionRes {
 pub enum InteractionRes {
     Immediate(ReturnValue),
     #[allow(dead_code)]
-    ImmediateWithWork(ReturnValue, Box<Future<Item = (), Error = ()> + Send>),
-    Blocking(Box<Future<Item = ReturnValue, Error = ()> + Send>),
+    ImmediateWithWork(ReturnValue, Box<dyn Future<Item = (), Error = ()> + Send>),
+    Blocking(Box<dyn Future<Item = ReturnValue, Error = ()> + Send>),
 }
 
 /// Debug impl for InteractionRes; used by debug logs.
@@ -109,6 +110,10 @@ pub struct State {
     pub sets: Arc<RwLock<KeySet>>,
     pub lists: Arc<RwLock<KeyList>>,
     pub hashes: Arc<RwLock<KeyHash>>,
+    #[serde(skip)]
+    pub commands_ran: Arc<AtomicU64>,
+    #[serde(skip)]
+    pub commands_threshold: u64,
 }
 
 /// Mapping of a ReturnValue to a RedisValue.

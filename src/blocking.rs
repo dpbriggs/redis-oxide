@@ -3,14 +3,14 @@ use crate::types::{InteractionRes, ReturnValue};
 use futures::future::Future;
 use futures::{Async, Poll};
 
-pub struct NilBlocking(Box<Fn() -> Option<ReturnValue> + Send>);
+pub struct NilBlocking(Box<dyn Fn() -> Option<ReturnValue> + Send>);
 
 impl NilBlocking {
     #[allow(dead_code)] // We don't have blocking atm
-    pub fn new(checker: Box<Fn() -> Option<ReturnValue> + Send>) -> NilBlocking {
+    pub fn new(checker: Box<dyn Fn() -> Option<ReturnValue> + Send>) -> NilBlocking {
         NilBlocking(checker)
     }
-    pub fn interaction_res(checker: Box<Fn() -> Option<ReturnValue> + Send>) -> InteractionRes {
+    pub fn interaction_res(checker: Box<dyn Fn() -> Option<ReturnValue> + Send>) -> InteractionRes {
         InteractionRes::Blocking(Box::new(NilBlocking(checker)))
     }
 }
