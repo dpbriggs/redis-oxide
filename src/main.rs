@@ -31,6 +31,8 @@ mod hashes;
 mod keys;
 mod lists;
 mod logger;
+#[macro_use]
+mod macros;
 mod misc;
 mod ops;
 mod server;

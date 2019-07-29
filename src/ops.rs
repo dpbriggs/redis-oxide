@@ -447,6 +447,13 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
             let value = Key::try_from(tail[2])?;
             ok!(HashOps::HSet(key, field, value))
         }
+        "hsetnx" => {
+            verify_size(&tail, 3)?;
+            let key = Key::try_from(tail[0])?;
+            let field = Key::try_from(tail[1])?;
+            let value = Key::try_from(tail[2])?;
+            ok!(HashOps::HSetNX(key, field, value))
+        }
         "hmset" => {
             verify_size_lower(&tail, 3)?;
             verify_tail_even(&tail)?;
@@ -498,13 +505,19 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
             let key = Key::try_from(tail[0])?;
             ok!(HashOps::HVals(key))
         }
-        // "hincrby" => {
-        //     verify_size(&tail, 3)?;
-        //     let key = Key::try_from(tail[0])?;
-        //     let field = Key::try_from(tail[1])?;
-        //     let value = Count::try_from(tail[2])?;
-        //     Ok(Ops::Hashes(HashOps::HIncrBy(key, field, value)))
-        // }
+        "hstrlen" => {
+            verify_size(&tail, 2)?;
+            let key = Key::try_from(tail[0])?;
+            let field = Key::try_from(tail[1])?;
+            ok!(HashOps::HStrLen(key, field))
+        }
+        "hincrby" => {
+            verify_size(&tail, 3)?;
+            let key = Key::try_from(tail[0])?;
+            let field = Key::try_from(tail[1])?;
+            let value = Count::try_from(tail[2])?;
+            Ok(Ops::Hashes(HashOps::HIncrBy(key, field, value)))
+        }
         _ => Err(OpsError::UnknownOp),
     }
 }

@@ -1,8 +1,9 @@
 use crate::types::{Count, InteractionRes, Key, ReturnValue, State, StateInteration, Value};
+use std::collections::hash_map::Entry;
 
+/// Hash ops
 #[derive(Debug, Clone)]
 pub enum HashOps {
-    // Hash ops
     HGet(Key, Key),
     HSet(Key, Key, Value),
     HExists(Key, Key),
@@ -10,10 +11,18 @@ pub enum HashOps {
     HMGet(Key, Vec<Key>),
     HKeys(Key),
     HMSet(Key, Vec<(Key, Value)>),
-    // HIncrBy(Key, Key, Count),
+    HIncrBy(Key, Key, Count),
     HLen(Key),
     HDel(Key, Vec<Key>),
     HVals(Key),
+    HStrLen(Key, Key),
+    HSetNX(Key, Key, Value),
+}
+
+macro_rules! ops_error {
+    ($state:expr) => {
+        InteractionRes::Immediate(ReturnValue::Error($state))
+    };
 }
 
 macro_rules! read_hashes {
@@ -96,17 +105,27 @@ impl StateInteration for HashOps {
                 write_hashes!(state, &key, hash);
                 hash.unwrap().extend(key_values);
                 ReturnValue::Ok
-            } // HashOps::HIncrBy(key, field, count) => {
-            //     // TODO
-            //     // state.create_hashes_if_necessary(&key);
-            //     // write_hashes!(state, &key, hashes);
-            //     // let hashes = hashes.unwrap();
-            //     // match hashes.get(&field) {
-            //     //     Some(hash) => hash,
-            //     //     None => 0
-            //     // }
-            //     ReturnValue::Ok
-            // }
+            }
+            HashOps::HIncrBy(key, field, count) => {
+                state.create_hashes_if_necessary(&key);
+                write_hashes!(state, &key, hashes);
+                let hashes = hashes.unwrap();
+                let mut curr_value = match hashes.get(&field) {
+                    Some(value) => {
+                        let i64_repr = std::str::from_utf8(value)
+                            .map(|e| e.parse::<i64>())
+                            .unwrap();
+                        if let Err(_) = i64_repr {
+                            return ops_error!(b"Bad Type!");
+                        }
+                        i64_repr.unwrap()
+                    }
+                    None => 0,
+                };
+                curr_value += count;
+                hashes.insert(field, curr_value.to_string().as_bytes().to_vec());
+                ReturnValue::Ok
+            }
             HashOps::HLen(key) => match read_hashes!(state, &key) {
                 Some(hash) => ReturnValue::IntRes(hash.len() as Count),
                 None => ReturnValue::IntRes(0),
@@ -124,6 +143,30 @@ impl StateInteration for HashOps {
                 }
                 None => ReturnValue::Array(vec![]),
             },
+            HashOps::HStrLen(key, field) => read_hashes!(state)
+                .get(&key)
+                .and_then(|hashes| hashes.get(&field))
+                .map_or(ReturnValue::IntRes(0), |v| {
+                    ReturnValue::IntRes(v.len() as Count)
+                }),
+            HashOps::HSetNX(key, field, value) => {
+                state.create_hashes_if_necessary(&key);
+                write_hashes!(state, &key, hash);
+                if let Entry::Vacant(ent) = hash.unwrap().entry(field) {
+                    ent.insert(value);
+                    ReturnValue::IntRes(1)
+                } else {
+                    ReturnValue::IntRes(0)
+                }
+                // hash.unwrap().entry(field).or_insert(value);
+                // if hash.unwrap().contains_key(&field) {
+                //     ReturnValue::IntRes(0)
+                // } else {
+                //     hash.unwrap().insert(field, value);
+                //     ReturnValue::IntRes(1)
+                // }
+                // ReturnValue::IntRes(0)
+            }
         }
         .into()
     }

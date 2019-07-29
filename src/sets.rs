@@ -25,6 +25,9 @@ pub enum SetAction {
     Union,
     Inter,
 }
+
+// make_reader!(sets);
+// make_writer!(sets);
 macro_rules! read_sets {
     ($state:expr) => {
         $state.sets.read()
