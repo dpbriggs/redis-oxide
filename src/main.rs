@@ -1,4 +1,5 @@
 #![deny(unsafe_code)]
+#![feature(concat_idents)]
 extern crate bincode;
 #[cfg(test)]
 extern crate pretty_assertions;

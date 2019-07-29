@@ -1,4 +1,5 @@
 use crate::types::{Count, InteractionRes, Key, ReturnValue, State, StateInteration, Value};
+use crate::{make_reader, make_writer};
 use std::collections::hash_map::Entry;
 
 /// Hash ops
@@ -25,31 +26,8 @@ macro_rules! ops_error {
     };
 }
 
-macro_rules! read_hashes {
-    ($state:expr) => {
-        $state.hashes.read()
-    };
-    ($state:expr, $key:expr) => {
-        $state.hashes.read().get($key)
-    };
-    ($state:expr, $key:expr, $var_name:ident) => {
-        let __temp_name = $state.hashes.read();
-        let $var_name = __temp_name.get($key);
-    };
-}
-
-macro_rules! write_hashes {
-    ($state:expr) => {
-        $state.hashes.write()
-    };
-    ($state:expr, $key:expr) => {
-        $state.hashes.write().get_mut($key)
-    };
-    ($state: expr, $key:expr, $var_name:ident) => {
-        let mut __temp_name = $state.hashes.write();
-        let $var_name = __temp_name.get_mut($key);
-    };
-}
+make_reader!(hashes, read_hashes);
+make_writer!(hashes, write_hashes);
 
 impl StateInteration for HashOps {
     fn interact(self, state: State) -> InteractionRes {
@@ -61,7 +39,7 @@ impl StateInteration for HashOps {
             HashOps::HSet(key, field, value) => {
                 state.create_hashes_if_necessary(&key);
                 write_hashes!(state, &key, hash);
-                hash.unwrap().insert(field, value);
+                hash.insert(field, value);
                 ReturnValue::Ok
             }
             HashOps::HExists(key, field) => read_hashes!(state)
@@ -103,13 +81,12 @@ impl StateInteration for HashOps {
             HashOps::HMSet(key, key_values) => {
                 state.create_hashes_if_necessary(&key);
                 write_hashes!(state, &key, hash);
-                hash.unwrap().extend(key_values);
+                hash.extend(key_values);
                 ReturnValue::Ok
             }
             HashOps::HIncrBy(key, field, count) => {
                 state.create_hashes_if_necessary(&key);
                 write_hashes!(state, &key, hashes);
-                let hashes = hashes.unwrap();
                 let mut curr_value = match hashes.get(&field) {
                     Some(value) => {
                         let i64_repr = std::str::from_utf8(value)
@@ -152,7 +129,7 @@ impl StateInteration for HashOps {
             HashOps::HSetNX(key, field, value) => {
                 state.create_hashes_if_necessary(&key);
                 write_hashes!(state, &key, hash);
-                if let Entry::Vacant(ent) = hash.unwrap().entry(field) {
+                if let Entry::Vacant(ent) = hash.entry(field) {
                     ent.insert(value);
                     ReturnValue::IntRes(1)
                 } else {
