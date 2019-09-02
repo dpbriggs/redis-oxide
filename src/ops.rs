@@ -39,6 +39,7 @@ pub enum OpsError {
     UnknownOp,
     NotEnoughArgs(usize, usize), // req, given
     WrongNumberOfArgs(usize, usize),
+    InvalidArgPattern(&'static str),
     InvalidType,
     SyntaxError,
     InvalidArgs(String),
@@ -49,6 +50,10 @@ impl From<OpsError> for RedisValue {
         match op {
             OpsError::InvalidStart => RedisValue::Error(b"Invalid start!".to_vec()),
             OpsError::UnknownOp => RedisValue::Error(b"Unknown Operation!".to_vec()),
+            OpsError::InvalidArgPattern(explain) => {
+                let f = format!("Invalid Arg Pattern, {}", explain);
+                RedisValue::Error(f.as_bytes().to_vec())
+            }
             OpsError::NotEnoughArgs(req, given) => {
                 let f = format!("Not enough arguments, {} required, {} given!", req, given);
                 RedisValue::Error(f.as_bytes().to_vec())
@@ -165,6 +170,14 @@ fn translate_string(start: &[u8]) -> Result<Ops, OpsError> {
     }
 }
 
+/// Ensure the passed collection has an even number of arguments.
+fn ensure_even<T>(v: &[T]) -> Result<(), OpsError> {
+    if v.len() % 2 != 0 {
+        return Err(OpsError::InvalidArgPattern("even number of arguments required!"));
+    }
+    Ok(())
+}
+
 fn all_strings(v: &[&RedisValue]) -> bool {
     v.iter().all(|x| match x {
         RedisValue::SimpleString(_) => true,
@@ -181,19 +194,11 @@ fn tails_as_strings(tail: &[&RedisValue]) -> Result<Vec<Value>, OpsError> {
     Ok(keys)
 }
 
+/// Verify that the collection v has _at least_ min_size values.
+/// e.g. If you wanted to verify that there's two or more items, min_size would be 2.
 fn verify_size_lower(v: &[&RedisValue], min_size: usize) -> Result<(), OpsError> {
     if v.len() < min_size {
         return Err(OpsError::NotEnoughArgs(min_size, v.len()));
-    }
-    Ok(())
-}
-
-fn verify_tail_even(tail: &[&RedisValue]) -> Result<(), OpsError> {
-    if (tail.len() - 1) % 2 != 0 {
-        return Err(OpsError::InvalidArgs(format!(
-            "Even number of args required! ({} given)",
-            tail.len() - 1
-        )));
     }
     Ok(())
 }
@@ -222,6 +227,20 @@ fn get_key_and_tail(array: &[RedisValue]) -> Result<(Key, Vec<Value>), OpsError>
     let tail: Vec<_> = array.iter().skip(2).collect();
     let vals = tails_as_strings(&tail)?;
     Ok((set_key, vals))
+}
+
+/// Transform a sequence of [Key1, Val1, Key2, Val2, ...] -> Vec<(Key, Value)>
+fn get_key_value_pairs(tail: &[&RedisValue]) -> Result<Vec<(Key, Value)>, OpsError> {
+    ensure_even(tail)?;
+    let keys = tail.iter().step_by(2);
+    let vals = tail.iter().skip(1).step_by(2);
+    let mut ret = Vec::new();
+    for (&key, &val) in keys.zip(vals) {
+        let key = Key::try_from(key)?;
+        let val = Value::try_from(val)?;
+        ret.push((key, val))
+    }
+    Ok(ret)
 }
 
 /// Convenience macro to automatically construct the right variant
@@ -260,10 +279,23 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
             let (key, val) = get_key_and_val(array)?;
             ok!(KeyOps::Set(key, val))
         }
+        "mset" => {
+            ok!(KeyOps::MSet(get_key_value_pairs(&tail)?))
+        }
         "get" => {
             verify_size(&tail, 1)?;
             let key = Key::try_from(tail[0])?;
             ok!(KeyOps::Get(key))
+        }
+        "mget" => {
+            verify_size_lower(&tail, 1)?;
+            let keys = tails_as_strings(&tail)?;
+            ok!(KeyOps::MGet(keys))
+        }
+        "test" => {
+            verify_size(&tail, 1)?;
+            let key = Key::try_from(tail[0])?;
+            ok!(KeyOps::Test(key))
         }
         "del" => {
             verify_size_lower(&tail, 1)?;
@@ -275,6 +307,12 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
             let key = Key::try_from(tail[0])?;
             let new_key = Key::try_from(tail[1])?;
             ok!(KeyOps::Rename(key, new_key))
+        }
+        "renamenx" => {
+            verify_size(&tail, 2)?;
+            let key = Key::try_from(tail[0])?;
+            let new_key = Key::try_from(tail[1])?;
+            ok!(KeyOps::RenameNx(key, new_key))
         }
         "exists" => {
             verify_size_lower(&tail, 1)?;
@@ -456,15 +494,15 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
         }
         "hmset" => {
             verify_size_lower(&tail, 3)?;
-            verify_tail_even(&tail)?;
             let key = Key::try_from(tail[0])?;
-            let args = tails_as_strings(&tail[1..])?;
-            // TODO: Avoid cloning here
-            let mut key_value_tuples: Vec<(Key, Value)> = Vec::new();
-            for i in args.chunks(2) {
-                let key_value = (i[0].clone(), i[1].clone());
-                key_value_tuples.push(key_value);
-            }
+            // let args = tails_as_strings(&tail[1..])?;
+            // // TODO: Avoid cloning here
+            // let mut key_value_tuples: Vec<(Key, Value)> = Vec::new();
+            // for i in args.chunks(2) {
+            //     let key_value = (i[0].clone(), i[1].clone());
+            //     key_value_tuples.push(key_value);
+            // }
+            let key_value_tuples = get_key_value_pairs(&tail[1..])?;
             ok!(HashOps::HMSet(key, key_value_tuples))
         }
         "hexists" => {

@@ -92,7 +92,7 @@ impl StateInteration for HashOps {
                         let i64_repr = std::str::from_utf8(value)
                             .map(|e| e.parse::<i64>())
                             .unwrap();
-                        if let Err(_) = i64_repr {
+                        if i64_repr.is_err() {
                             return ops_error!(b"Bad Type!");
                         }
                         i64_repr.unwrap()

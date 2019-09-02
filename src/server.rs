@@ -49,7 +49,7 @@ fn process(socket: TcpStream, state: State, dump_file: DumpFile) {
                     Ordering::SeqCst,
                     Ordering::SeqCst,
                 );
-                if let Ok(_) = should_save {
+                if should_save.is_ok() {
                     // Keeping these in an outer scope appeases the compiler,
                     // as it cannot determine if lifetimes are long enough.
                     // It's pretty cheap to clone anyway -- they're just arcs.

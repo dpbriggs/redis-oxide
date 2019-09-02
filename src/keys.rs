@@ -9,9 +9,13 @@ use crate::types::{Count, InteractionRes, Key, ReturnValue, State, StateInterati
 pub enum KeyOps {
     // Key Value
     Set(Key, Value),
+    MSet(Vec<(Key, Value)>),
     Get(Key),
+    MGet(Vec<Key>),
     Del(Vec<Key>),
     Rename(Key, Key),
+    RenameNx(Key, Key),
+    Test(Key),
 }
 
 impl StateInteration for KeyOps {
@@ -24,6 +28,16 @@ impl StateInteration for KeyOps {
                 .map_or(ReturnValue::Nil.into(), |v| {
                     ReturnValue::StringRes(v.to_vec()).into()
                 }),
+            KeyOps::MGet(keys) => {
+                let kv = state.kv.read();
+                let vals = keys.iter().map(|key| {
+                    match kv.get(key) {
+                        Some(v) => ReturnValue::StringRes(v.to_vec()),
+                        None => ReturnValue::Nil
+                    }
+                }).collect();
+                ReturnValue::Array(vals).into()
+            }
             KeyOps::Set(key, value) => {
                 state.kv.write().insert(key.clone(), value);
                 // let state_ptr = state.clone();
@@ -40,6 +54,13 @@ impl StateInteration for KeyOps {
                 // ReturnValue::Ok
                 ReturnValue::Ok.into()
             }
+            KeyOps::MSet(key_vals) => {
+                let mut kv = state.kv.write();
+                for (key, val) in key_vals.into_iter() {
+                    kv.insert(key, val);
+                }
+                ReturnValue::Ok.into()
+            },
             KeyOps::Del(keys) => {
                 let deleted = keys
                     .iter()
@@ -57,6 +78,23 @@ impl StateInteration for KeyOps {
                     }
                     None => ReturnValue::Error(b"no such key").into(),
                 }
+            }
+            KeyOps::RenameNx(key, new_key) => {
+                let mut keys = state.kv.write();
+                if keys.contains_key(&new_key) {
+                    return ReturnValue::IntRes(0).into();
+                }
+                match keys.remove(&key) {
+                    Some(value) => {
+                        keys.insert(new_key, value);
+                        ReturnValue::IntRes(1).into()
+                    }
+                    None => ReturnValue::Error(b"no such key").into(),
+                }
+            }
+            KeyOps::Test(key) => {
+                println!("{}", String::from_utf8_lossy(&key));
+                ReturnValue::Ok.into()
             }
         }
     }
