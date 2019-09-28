@@ -1,4 +1,5 @@
 #+AUTHOR: David Briggs
+#+STARTUP: SHOWALL
 
 * Redis Oxide
 
@@ -83,10 +84,12 @@ b'foobar'
 - [X] Keys
 - [X] Sets
 - [X] Lists
-- [ ] Hashes
+- [X] Hashes
 - [ ] HyperLogLog
 - [ ] Geo
-- [ ] Sorted Sets
+- [-] Sorted Sets
+  - [X] Basic Functionality
+  - [ ] Still need some operations
 - [ ] Strings
 
 We should solidify the above before working on the more complex bits, but contributions are welcome :)
