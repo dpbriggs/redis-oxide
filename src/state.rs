@@ -44,6 +44,14 @@ impl State {
         }
     }
 
+    pub fn create_zset_if_necessary(&self, set_key: &[u8]) {
+        if !self.zsets.read().contains_key(set_key) {
+            self.zsets
+                .write()
+                .insert(set_key.to_vec(), Default::default());
+        }
+    }
+
     pub fn exec_op<T: StateInteration>(self, action: T) -> InteractionRes {
         action.interact(self)
     }

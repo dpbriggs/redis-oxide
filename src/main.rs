@@ -34,10 +34,12 @@ mod lists;
 mod logger;
 #[macro_use]
 mod macros;
+mod data_structures;
 mod misc;
 mod ops;
 mod server;
 mod sets;
+mod sorted_sets;
 mod startup;
 mod state;
 mod types;

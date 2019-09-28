@@ -1,14 +1,16 @@
 use std::convert::TryFrom;
+use std::fmt::Debug;
 
 use crate::hashes::HashOps;
 use crate::keys::KeyOps;
 use crate::lists::ListOps;
 use crate::misc::MiscOps;
 use crate::sets::SetOps;
+use crate::sorted_sets::ZSetOps;
 use crate::types::{InteractionRes, State, StateInteration};
 
 use crate::types::{
-    Count, Index, Key, RedisValue, Value, EMPTY_ARRAY, NULL_ARRAY, NULL_BULK_STRING,
+    Count, Index, Key, RedisValue, Score, Value, EMPTY_ARRAY, NULL_ARRAY, NULL_BULK_STRING,
 };
 
 #[derive(Debug, Clone)]
@@ -18,6 +20,7 @@ pub enum Ops {
     Lists(ListOps),
     Misc(MiscOps),
     Hashes(HashOps),
+    ZSets(ZSetOps),
 }
 
 impl StateInteration for Ops {
@@ -28,6 +31,7 @@ impl StateInteration for Ops {
             Ops::Lists(op) => op.interact(state),
             Ops::Misc(op) => op.interact(state),
             Ops::Hashes(op) => op.interact(state),
+            Ops::ZSets(op) => op.interact(state),
         }
     }
 }
@@ -148,10 +152,9 @@ impl TryFrom<&RedisValue> for Count {
     fn try_from(r: &RedisValue) -> Result<Count, Self::Error> {
         match r {
             RedisValue::Int(e) => Ok(*e as Count),
-            RedisValue::SimpleString(s) | RedisValue::BulkString(s) => {
-                let s = String::from_utf8_lossy(&s);
-                match s.parse::<Count>() {
-                    Ok(i) => Ok(i),
+            RedisValue::BulkString(s) | RedisValue::SimpleString(s) => {
+                match String::from_utf8(s.to_owned()) {
+                    Ok(s) => s.parse().map_err(|_| OpsError::InvalidType),
                     Err(_) => Err(OpsError::InvalidType),
                 }
             }
@@ -160,6 +163,8 @@ impl TryFrom<&RedisValue> for Count {
     }
 }
 
+// Translate single RedisValue inputs into an Ops
+// Used for commands like PING
 fn translate_string(start: &[u8]) -> Result<Ops, OpsError> {
     let start = &String::from_utf8_lossy(start);
     match start.to_lowercase().as_ref() {
@@ -173,71 +178,98 @@ fn translate_string(start: &[u8]) -> Result<Ops, OpsError> {
 /// Ensure the passed collection has an even number of arguments.
 fn ensure_even<T>(v: &[T]) -> Result<(), OpsError> {
     if v.len() % 2 != 0 {
-        return Err(OpsError::InvalidArgPattern("even number of arguments required!"));
+        return Err(OpsError::InvalidArgPattern(
+            "even number of arguments required!",
+        ));
     }
     Ok(())
 }
 
-fn all_strings(v: &[&RedisValue]) -> bool {
-    v.iter().all(|x| match x {
-        RedisValue::SimpleString(_) => true,
-        RedisValue::BulkString(_) => true,
-        _ => false,
-    })
-}
-
-fn tails_as_strings(tail: &[&RedisValue]) -> Result<Vec<Value>, OpsError> {
-    if !all_strings(&tail) {
-        return Err(OpsError::InvalidType);
+fn values_from_tail<'a, ValueType>(tail: &[&'a RedisValue]) -> Result<Vec<ValueType>, OpsError>
+where
+    ValueType: TryFrom<&'a RedisValue, Error = OpsError>,
+{
+    let mut items: Vec<ValueType> = Vec::new();
+    for item in tail.iter() {
+        let value = ValueType::try_from(item)?;
+        items.push(value);
     }
-    let keys: Vec<Value> = tail.iter().map(|x| Value::try_from(*x).unwrap()).collect();
-    Ok(keys)
+    Ok(items)
 }
 
 /// Verify that the collection v has _at least_ min_size values.
 /// e.g. If you wanted to verify that there's two or more items, min_size would be 2.
-fn verify_size_lower(v: &[&RedisValue], min_size: usize) -> Result<(), OpsError> {
+fn verify_size_lower<T>(v: &[T], min_size: usize) -> Result<(), OpsError> {
     if v.len() < min_size {
         return Err(OpsError::NotEnoughArgs(min_size, v.len()));
     }
     Ok(())
 }
 
-fn verify_size(v: &[&RedisValue], size: usize) -> Result<(), OpsError> {
+/// Verify the exact size of a sequence.
+/// Useful for some commands that require an exact number of arguments (like get and set)
+fn verify_size<T>(v: &[T], size: usize) -> Result<(), OpsError> {
     if v.len() != size {
         return Err(OpsError::WrongNumberOfArgs(size, v.len()));
     }
     Ok(())
 }
 
-fn get_key_and_val(array: &[RedisValue]) -> Result<(Key, Value), OpsError> {
+/// Get a tuple of (KeyType, ValueType)
+/// Mainly used for the thousand 2-adic ops
+fn get_key_and_value<'a, KeyType, ValueType>(
+    array: &'a [RedisValue],
+) -> Result<(KeyType, ValueType), OpsError>
+where
+    KeyType: TryFrom<&'a RedisValue, Error = OpsError>,
+    ValueType: TryFrom<&'a RedisValue, Error = OpsError>,
+{
     if array.len() < 3 {
-        return Err(OpsError::WrongNumberOfArgs(3, array.len()));
+        return Err(OpsError::WrongNumberOfArgs(2, array.len() - 1));
     }
-    let key = Key::try_from(&array[1])?;
-    let val = Value::try_from(&array[2])?;
+    let key = KeyType::try_from(&array[1])?;
+    let val = ValueType::try_from(&array[2])?;
     Ok((key, val))
 }
 
-fn get_key_and_tail(array: &[RedisValue]) -> Result<(Key, Vec<Value>), OpsError> {
+/// Transform &[RedisValue] into (KeyType, Vec<TailType>)
+/// Used for commands like DEL arg1 arg2...
+fn get_key_and_tail<'a, KeyType, TailType>(
+    array: &'a [RedisValue],
+) -> Result<(KeyType, Vec<TailType>), OpsError>
+where
+    KeyType: TryFrom<&'a RedisValue, Error = OpsError>,
+    TailType: TryFrom<&'a RedisValue, Error = OpsError>,
+{
     if array.len() < 3 {
         return Err(OpsError::WrongNumberOfArgs(3, array.len()));
     }
-    let set_key = Key::try_from(&array[1])?;
-    let tail: Vec<_> = array.iter().skip(2).collect();
-    let vals = tails_as_strings(&tail)?;
-    Ok((set_key, vals))
+    let set_key = KeyType::try_from(&array[1])?;
+    let mut tail: Vec<TailType> = Vec::new();
+    for tail_item in array.iter().skip(2) {
+        let tmp = TailType::try_from(&tail_item)?;
+        tail.push(tmp)
+    }
+    Ok((set_key, tail))
 }
 
 /// Transform a sequence of [Key1, Val1, Key2, Val2, ...] -> Vec<(Key, Value)>
-fn get_key_value_pairs(tail: &[&RedisValue]) -> Result<Vec<(Key, Value)>, OpsError> {
+fn get_key_value_pairs<'a, KeyType, ValueType>(
+    tail: &[&'a RedisValue],
+) -> Result<Vec<(KeyType, ValueType)>, OpsError>
+where
+    KeyType: TryFrom<&'a RedisValue, Error = OpsError> + Debug,
+    ValueType: TryFrom<&'a RedisValue, Error = OpsError> + Debug,
+{
     ensure_even(tail)?;
     let keys = tail.iter().step_by(2);
     let vals = tail.iter().skip(1).step_by(2);
     let mut ret = Vec::new();
     for (&key, &val) in keys.zip(vals) {
-        let key = Key::try_from(key)?;
-        let val = Value::try_from(val)?;
+        dbg!(key);
+        let key = KeyType::try_from(key)?;
+        dbg!(val);
+        let val = ValueType::try_from(val)?;
         ret.push((key, val))
     }
     Ok(ret)
@@ -261,6 +293,9 @@ macro_rules! ok {
     (ListOps::$OpName:ident($($OpArg:expr),*)) => {
         Ok(Ops::Lists(ListOps::$OpName($( $OpArg ),*)))
     };
+    (ZSetOps::$OpName:ident($($OpArg:expr),*)) => {
+        Ok(Ops::ZSets(ZSetOps::$OpName($( $OpArg ),*)))
+    };
 }
 
 fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
@@ -276,12 +311,10 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
     match head.to_lowercase().as_ref() {
         // Key-Value
         "set" => {
-            let (key, val) = get_key_and_val(array)?;
+            let (key, val) = get_key_and_value(array)?;
             ok!(KeyOps::Set(key, val))
         }
-        "mset" => {
-            ok!(KeyOps::MSet(get_key_value_pairs(&tail)?))
-        }
+        "mset" => ok!(KeyOps::MSet(get_key_value_pairs(&tail)?)),
         "get" => {
             verify_size(&tail, 1)?;
             let key = Key::try_from(tail[0])?;
@@ -289,7 +322,7 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
         }
         "mget" => {
             verify_size_lower(&tail, 1)?;
-            let keys = tails_as_strings(&tail)?;
+            let keys = values_from_tail(&tail)?;
             ok!(KeyOps::MGet(keys))
         }
         "test" => {
@@ -299,7 +332,7 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
         }
         "del" => {
             verify_size_lower(&tail, 1)?;
-            let keys = tails_as_strings(&tail)?;
+            let keys = values_from_tail(&tail)?;
             ok!(KeyOps::Del(keys))
         }
         "rename" => {
@@ -316,7 +349,7 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
         }
         "exists" => {
             verify_size_lower(&tail, 1)?;
-            let keys = tails_as_strings(&tail)?;
+            let keys = values_from_tail(&tail)?;
             ok!(MiscOps::Exists(keys))
         }
         // Sets
@@ -340,17 +373,17 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
         }
         "sdiff" => {
             verify_size_lower(&tail, 2)?;
-            let keys = tails_as_strings(&tail)?;
+            let keys = values_from_tail(&tail)?;
             ok!(SetOps::SDiff(keys))
         }
         "sunion" => {
             verify_size_lower(&tail, 2)?;
-            let keys = tails_as_strings(&tail)?;
+            let keys = values_from_tail(&tail)?;
             ok!(SetOps::SUnion(keys))
         }
         "sinter" => {
             verify_size_lower(&tail, 2)?;
-            let keys = tails_as_strings(&tail)?;
+            let keys = values_from_tail(&tail)?;
             ok!(SetOps::SInter(keys))
         }
         "sdiffstore" => {
@@ -375,7 +408,7 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
             ok!(SetOps::SPop(key, count))
         }
         "sismember" => {
-            let (key, member) = get_key_and_val(array)?;
+            let (key, member) = get_key_and_value(array)?;
             ok!(SetOps::SIsMember(key, member))
         }
         "smove" => {
@@ -519,7 +552,7 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
         "hmget" => {
             verify_size_lower(&tail, 2)?;
             let key = Key::try_from(tail[0])?;
-            let fields = tails_as_strings(&tail[1..])?;
+            let fields = values_from_tail(&tail[1..])?;
             ok!(HashOps::HMGet(key, fields))
         }
         "hkeys" => {
@@ -535,7 +568,7 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
         "hdel" => {
             verify_size_lower(&tail, 2)?;
             let key = Key::try_from(tail[0])?;
-            let fields = tails_as_strings(&tail[1..])?;
+            let fields = values_from_tail(&tail[1..])?;
             ok!(HashOps::HDel(key, fields))
         }
         "hvals" => {
@@ -544,9 +577,13 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
             ok!(HashOps::HVals(key))
         }
         "hstrlen" => {
-            verify_size(&tail, 2)?;
-            let key = Key::try_from(tail[0])?;
-            let field = Key::try_from(tail[1])?;
+            // verify_size(&tail, 2)?;
+            // let key = Key::try_from(tail[0])?;
+            // let field = Key::try_from(tail[1])?;
+
+            // ok!(HashOps::HStrLen(key, field))
+            // get_key_and_value
+            let (key, field) = get_key_and_value(array)?;
             ok!(HashOps::HStrLen(key, field))
         }
         "hincrby" => {
@@ -555,6 +592,54 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
             let field = Key::try_from(tail[1])?;
             let value = Count::try_from(tail[2])?;
             Ok(Ops::Hashes(HashOps::HIncrBy(key, field, value)))
+        }
+        // Sorted Sets
+        "zadd" => {
+            verify_size_lower(&tail, 3)?;
+            let key = Key::try_from(tail[0])?;
+            let member_scores = get_key_value_pairs(&tail[1..])?;
+            ok!(ZSetOps::ZAdd(key, member_scores))
+        }
+        "zrem" => {
+            verify_size_lower(&tail, 2)?;
+            let (key, keys_to_rem) = get_key_and_tail(&array[1..])?;
+            ok!(ZSetOps::ZRem(key, keys_to_rem))
+        }
+        "zrange" => {
+            verify_size(&tail, 3)?;
+            let key = Key::try_from(tail[0])?;
+            let lower = Score::try_from(tail[1])?;
+            let upper = Score::try_from(tail[2])?;
+            ok!(ZSetOps::ZRange(key, lower, upper))
+        }
+        "zcard" => {
+            verify_size(&tail, 1)?;
+            let key = Key::try_from(tail[0])?;
+            ok!(ZSetOps::ZCard(key))
+        }
+        "zscore" => {
+            verify_size(&tail, 2)?;
+            let key = Key::try_from(tail[0])?;
+            let score = Key::try_from(tail[1])?;
+            ok!(ZSetOps::ZScore(key, score))
+        }
+        "zpopmax" => {
+            verify_size(&tail, 2)?;
+            let key = Key::try_from(tail[0])?;
+            let count = Count::try_from(tail[1])?;
+            ok!(ZSetOps::ZPopMax(key, count))
+        }
+        "zpopmin" => {
+            verify_size(&tail, 2)?;
+            let key = Key::try_from(tail[0])?;
+            let count = Count::try_from(tail[1])?;
+            ok!(ZSetOps::ZPopMin(key, count))
+        }
+        "zrank" => {
+            verify_size(&tail, 2)?;
+            let key = Key::try_from(tail[0])?;
+            let member_key = Key::try_from(tail[1])?;
+            ok!(ZSetOps::ZRank(key, member_key))
         }
         _ => Err(OpsError::UnknownOp),
     }

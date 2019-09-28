@@ -24,32 +24,6 @@ pub enum ListOps {
 make_reader!(lists, read_lists);
 make_writer!(lists, write_lists);
 
-// macro_rules! read_lists {
-//     ($state:expr) => {
-//         $state.lists.read()
-//     };
-//     ($state:expr, $key:expr) => {
-//         $state.lists.read().get($key)
-//     };
-//     ($state:expr, $key:expr, $var_name:ident) => {
-//         let __temp_name = $state.lists.read();
-//         let $var_name = __temp_name.get($key);
-//     };
-// }
-
-// macro_rules! write_lists {
-//     ($state:expr) => {
-//         $state.lists.write()
-//     };
-//     ($state:expr, $key:expr) => {
-//         $state.lists.write().get_mut($key)
-//     };
-//     ($state: expr, $key:expr, $var_name:ident) => {
-//         let mut __temp_name = $state.lists.write();
-//         let $var_name = __temp_name.get_mut($key).unwrap();
-//     };
-// }
-
 impl StateInteration for ListOps {
     #[allow(clippy::cognitive_complexity)]
     fn interact(self, state: State) -> InteractionRes {

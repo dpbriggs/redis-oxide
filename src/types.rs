@@ -9,6 +9,8 @@ use tokio::prelude::*;
 use parking_lot::Mutex;
 use std::fs::File;
 
+use crate::data_structures::sorted_set::SortedSet;
+
 /// These types are used by state and ops to actually perform useful work.
 pub type Value = Vec<u8>;
 /// Key is the standard type to index our structures
@@ -17,6 +19,8 @@ pub type Key = Vec<u8>;
 pub type Count = i64;
 /// Index is used to represent indices in structures.
 pub type Index = i64;
+/// Score is used in sorted sets
+pub type Score = i64;
 
 /// DumpFile type alias.
 pub type DumpFile = Arc<Mutex<File>>;
@@ -62,6 +66,22 @@ impl From<ReturnValue> for InteractionRes {
     }
 }
 
+/// Convenience trait to convert ReturnValues to InteractionRes.
+impl From<Count> for InteractionRes {
+    fn from(int: Count) -> InteractionRes {
+        ReturnValue::IntRes(int).into()
+    }
+}
+
+/// Convenience trait to convert ReturnValues to InteractionRes.
+impl From<Vec<String>> for InteractionRes {
+    fn from(strings: Vec<String>) -> InteractionRes {
+        let strings_to_bytes: Vec<Vec<u8>> =
+            strings.into_iter().map(|s| s.as_bytes().to_vec()).collect();
+        ReturnValue::MultiStringRes(strings_to_bytes).into()
+    }
+}
+
 /// Highest level output type. This is the return value returned by operations.
 pub enum InteractionRes {
     Immediate(ReturnValue),
@@ -101,15 +121,23 @@ type KeySet = HashMap<Key, HashSet<Value>>;
 type KeyList = HashMap<Key, VecDeque<Value>>;
 /// Canonical type for Key-Hash storage.
 type KeyHash = HashMap<Key, HashMap<Key, Value>>;
+/// Canonical type for Key-Hash storage.
+type KeyZSet = HashMap<Key, SortedSet>;
 
 /// The state stored by redis-oxide. These fields are the ones
 /// used by the various datastructure files (keys.rs, etc)
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct State {
+    #[serde(default)]
     pub kv: Arc<RwLock<KeyString>>,
+    #[serde(default)]
     pub sets: Arc<RwLock<KeySet>>,
+    #[serde(default)]
     pub lists: Arc<RwLock<KeyList>>,
+    #[serde(default)]
     pub hashes: Arc<RwLock<KeyHash>>,
+    #[serde(default)]
+    pub zsets: Arc<RwLock<KeyZSet>>,
     #[serde(skip)]
     pub commands_ran: Arc<AtomicU64>,
     #[serde(skip)]
