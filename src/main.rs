@@ -1,22 +1,10 @@
 #![deny(unsafe_code)]
-#![feature(concat_idents)]
-extern crate bincode;
-#[cfg(test)]
-extern crate pretty_assertions;
-extern crate promptly;
-extern crate shlex;
-
-extern crate structopt;
 
 #[macro_use]
 extern crate serde_derive;
 
-#[cfg(test)]
-extern crate proptest;
-
 #[macro_use]
 extern crate slog;
-extern crate sloggers;
 
 #[macro_use]
 extern crate combine;
@@ -27,6 +15,7 @@ use structopt::StructOpt;
 
 mod asyncresp;
 mod blocking;
+mod bloom;
 mod database;
 mod hashes;
 mod keys;

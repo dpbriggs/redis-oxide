@@ -1,6 +1,7 @@
 use std::convert::TryFrom;
 use std::fmt::Debug;
 
+use crate::bloom::BloomOps;
 use crate::hashes::HashOps;
 use crate::keys::KeyOps;
 use crate::lists::ListOps;
@@ -21,6 +22,7 @@ pub enum Ops {
     Misc(MiscOps),
     Hashes(HashOps),
     ZSets(ZSetOps),
+    Blooms(BloomOps),
 }
 
 impl StateInteration for Ops {
@@ -32,6 +34,7 @@ impl StateInteration for Ops {
             Ops::Misc(op) => op.interact(state),
             Ops::Hashes(op) => op.interact(state),
             Ops::ZSets(op) => op.interact(state),
+            Ops::Blooms(op) => op.interact(state),
         }
     }
 }
@@ -295,6 +298,9 @@ macro_rules! ok {
     };
     (ZSetOps::$OpName:ident($($OpArg:expr),*)) => {
         Ok(Ops::ZSets(ZSetOps::$OpName($( $OpArg ),*)))
+    };
+    (BloomOps::$OpName:ident($($OpArg:expr),*)) => {
+        Ok(Ops::Blooms(BloomOps::$OpName($( $OpArg ),*)))
     };
 }
 
@@ -640,6 +646,18 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
             let key = Key::try_from(tail[0])?;
             let member_key = Key::try_from(tail[1])?;
             ok!(ZSetOps::ZRank(key, member_key))
+        }
+        "binsert" => {
+            verify_size(&tail, 2)?;
+            let key = Key::try_from(tail[0])?;
+            let value = Value::try_from(tail[1])?;
+            ok!(BloomOps::BInsert(key, value))
+        }
+        "bcontains" => {
+            verify_size(&tail, 2)?;
+            let key = Key::try_from(tail[0])?;
+            let value = Value::try_from(tail[1])?;
+            ok!(BloomOps::BContains(key, value))
         }
         _ => Err(OpsError::UnknownOp),
     }

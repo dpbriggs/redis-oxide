@@ -30,12 +30,13 @@ impl StateInteration for KeyOps {
                 }),
             KeyOps::MGet(keys) => {
                 let kv = state.kv.read();
-                let vals = keys.iter().map(|key| {
-                    match kv.get(key) {
+                let vals = keys
+                    .iter()
+                    .map(|key| match kv.get(key) {
                         Some(v) => ReturnValue::StringRes(v.to_vec()),
-                        None => ReturnValue::Nil
-                    }
-                }).collect();
+                        None => ReturnValue::Nil,
+                    })
+                    .collect();
                 ReturnValue::Array(vals).into()
             }
             KeyOps::Set(key, value) => {
@@ -60,7 +61,7 @@ impl StateInteration for KeyOps {
                     kv.insert(key, val);
                 }
                 ReturnValue::Ok.into()
-            },
+            }
             KeyOps::Del(keys) => {
                 let deleted = keys
                     .iter()

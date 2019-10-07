@@ -26,6 +26,7 @@ directories = "1.0.2"
 parking_lot = { version = "0.8.0", features = ["serde"] }
 rmp-serde = "0.13.7"
 spin = "0.5.2"
+growable-bloom-filter = "0.1.1"
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"

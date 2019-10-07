@@ -1,3 +1,4 @@
+use growable_bloom_filter::GrowableBloom;
 /// Common Types in the project.
 use parking_lot::RwLock;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -123,6 +124,8 @@ type KeyList = HashMap<Key, VecDeque<Value>>;
 type KeyHash = HashMap<Key, HashMap<Key, Value>>;
 /// Canonical type for Key-Hash storage.
 type KeyZSet = HashMap<Key, SortedSet>;
+/// Canonical type for Key-Bloom storage.
+type KeyBloom = HashMap<Key, GrowableBloom>;
 
 /// The state stored by redis-oxide. These fields are the ones
 /// used by the various datastructure files (keys.rs, etc)
@@ -138,6 +141,8 @@ pub struct State {
     pub hashes: Arc<RwLock<KeyHash>>,
     #[serde(default)]
     pub zsets: Arc<RwLock<KeyZSet>>,
+    #[serde(default)]
+    pub blooms: Arc<RwLock<KeyBloom>>,
     #[serde(skip)]
     pub commands_ran: Arc<AtomicU64>,
     #[serde(skip)]

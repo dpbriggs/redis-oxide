@@ -66,7 +66,12 @@ for i in range(100):
 list_res = r.lrange('list', 0, -1)
 
 pprint(list_res[0:3])
-pprint(sum(map(lambda x: int(x), list_res)))
+pprint(sum(map(int, list_res)))
+
+total = 0
+for i in range(100):
+    total += int(r.lpop('list'))
+pprint(total)
 #+end_src
 
 Which will print:
@@ -74,7 +79,8 @@ Which will print:
 #+begin_src python
 b'foobar'
 [b'0', b'1', b'2']
-19800
+4950
+4950
 #+end_src
 
 ** Things left to do
