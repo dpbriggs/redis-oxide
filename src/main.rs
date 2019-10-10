@@ -38,7 +38,8 @@ use self::logger::LOGGER;
 use self::server::server;
 use self::startup::{startup_message, Config};
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let opt = Config::from_args();
     startup_message(&opt);
     info!(LOGGER, "Initializing State...");
@@ -46,8 +47,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let dump_file = get_dump_file(&opt);
     let state = load_state(dump_file.clone(), &opt)?;
     info!(LOGGER, "Starting Server...");
-    if let Err(e) = server(state, dump_file, opt) {
-        error!(LOGGER, "Server failed to start! {:?}", e);
-    }
+    server(state, dump_file, opt).await;
+    // if let Err(e) = server(state, dump_file, opt) {
+    //     error!(LOGGER, "Server failed to start! {:?}", e);
+    // }
     Ok(())
 }

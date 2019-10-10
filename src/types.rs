@@ -87,8 +87,11 @@ impl From<Vec<String>> for InteractionRes {
 pub enum InteractionRes {
     Immediate(ReturnValue),
     #[allow(dead_code)]
-    ImmediateWithWork(ReturnValue, Box<dyn Future<Item = (), Error = ()> + Send>),
-    Blocking(Box<dyn Future<Item = ReturnValue, Error = ()> + Send>),
+    ImmediateWithWork(
+        ReturnValue,
+        Box<dyn Future<Output = ()> + Send + std::marker::Unpin>,
+    ),
+    Blocking(Box<dyn Future<Output = ReturnValue> + Send + std::marker::Unpin>),
 }
 
 /// Debug impl for InteractionRes; used by debug logs.

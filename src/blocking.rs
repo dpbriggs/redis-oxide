@@ -1,7 +1,8 @@
 use crate::types::{InteractionRes, ReturnValue};
 
-use futures::future::Future;
-use futures::{Async, Poll};
+use std::future::Future;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 pub struct NilBlocking(Box<dyn Fn() -> Option<ReturnValue> + Send>);
 
@@ -16,15 +17,14 @@ impl NilBlocking {
 }
 
 impl Future for NilBlocking {
-    type Item = ReturnValue;
-    type Error = ();
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+    type Output = ReturnValue;
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
         match self.0() {
-            Some(res) => Ok(Async::Ready(res)),
+            Some(res) => Poll::Ready(res),
             None => {
                 use crate::logger::LOGGER;
                 info!(LOGGER, "here");
-                Ok(Async::NotReady)
+                Poll::Pending
             }
         }
     }

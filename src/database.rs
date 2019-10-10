@@ -11,8 +11,7 @@ use std::io::SeekFrom;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
-use tokio::prelude::*;
+use std::time::Duration;
 use tokio::timer::Interval;
 
 const SAVE_STATE_PERIOD: u64 = 60 * 1000;
@@ -130,15 +129,16 @@ pub fn save_state(state: State, dump_file: DumpFile) {
 /// Save the current State to Dumpfile.
 ///
 /// Panics if state fails to dump.
-pub fn save_state_interval(
-    state: State,
-    dump_file: DumpFile,
-) -> impl Future<Item = (), Error = ()> {
-    Interval::new(Instant::now(), Duration::from_millis(SAVE_STATE_PERIOD))
-        .skip(1)
-        .for_each(move |_| {
-            save_state(state.clone(), dump_file.clone());
-            Ok(())
-        })
-        .map_err(|e| error!(LOGGER, "save state failed; err={:?}", e))
+pub async fn save_state_interval(state: State, dump_file: DumpFile) {
+    let mut interval = Interval::new_interval(Duration::from_millis(SAVE_STATE_PERIOD));
+    loop {
+        interval.next().await;
+        save_state(state.clone(), dump_file.clone());
+    }
+    // Interval::new(Instant::now(), Duration::from_millis(SAVE_STATE_PERIOD))
+    //     .skip(1)
+    //     .for_each(move |_| {
+    //         save_state(state.clone(), dump_file.clone());
+    //     })
+    //     .map_err(|e| error!(LOGGER, "save state failed; err={:?}", e))
 }
