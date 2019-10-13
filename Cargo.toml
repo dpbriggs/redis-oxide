@@ -12,7 +12,6 @@ rand = "0.6.5"
 tokio-codec = "0.2.0-alpha.6"
 bytes = "0.4.12"
 combine = "3.8.1"
-partial-io = { version = "0.3.0", features = ["tokio", "quickcheck"] }
 # futures = "0.1.26"
 # futures-locks = "0.3.3"
 sloggers = "0.3.2"
@@ -26,7 +25,7 @@ directories = "1.0.2"
 parking_lot = { version = "0.8.0", features = ["serde"] }
 rmp-serde = "0.13.7"
 spin = "0.5.2"
-growable-bloom-filter = "0.1.1"
+growable-bloom-filter = "0.2.0"
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"

@@ -40,17 +40,17 @@ fn dump_state(state: &State, dump_file: &mut File) -> Result<(), Box<dyn Error>>
 }
 
 /// Load state from the dump_file
-pub fn load_state(dump_file: DumpFile, config: &Config) -> Result<State, Box<dyn Error>> {
+pub fn load_state(dump_file: DumpFile, config: &Config) -> Result<Arc<State>, Box<dyn Error>> {
     let mut contents = dump_file.lock();
     if contents.metadata()?.len() == 0 {
-        return Ok(State::default());
+        return Ok(Arc::new(State::default()));
     }
 
     contents.seek(SeekFrom::Start(0))?;
     let mut state: State = rmps::decode::from_read(&*contents)?;
     state.commands_threshold = config.ops_until_save;
 
-    Ok(state)
+    Ok(Arc::new(state))
 }
 
 /// Make the data directory (directory where the dump file lives)
@@ -108,7 +108,7 @@ pub fn get_dump_file(config: &Config) -> DumpFile {
     Arc::new(Mutex::new(opened_file))
 }
 
-pub fn save_state(state: State, dump_file: DumpFile) {
+pub fn save_state(state: Arc<State>, dump_file: DumpFile) {
     info!(
         LOGGER,
         "Saving state (60s or {} ops ran)...", state.commands_threshold
@@ -119,7 +119,7 @@ pub fn save_state(state: State, dump_file: DumpFile) {
                 fatal_panic!("FAILED TO DUMP STATE!", e.description());
             }
         }
-        None => info!(
+        None => debug!(
             LOGGER,
             "Failed to save state! Someone else is currently writing..."
         ),
@@ -129,16 +129,10 @@ pub fn save_state(state: State, dump_file: DumpFile) {
 /// Save the current State to Dumpfile.
 ///
 /// Panics if state fails to dump.
-pub async fn save_state_interval(state: State, dump_file: DumpFile) {
+pub async fn save_state_interval(state: Arc<State>, dump_file: DumpFile) {
     let mut interval = Interval::new_interval(Duration::from_millis(SAVE_STATE_PERIOD));
     loop {
         interval.next().await;
         save_state(state.clone(), dump_file.clone());
     }
-    // Interval::new(Instant::now(), Duration::from_millis(SAVE_STATE_PERIOD))
-    //     .skip(1)
-    //     .for_each(move |_| {
-    //         save_state(state.clone(), dump_file.clone());
-    //     })
-    //     .map_err(|e| error!(LOGGER, "save state failed; err={:?}", e))
 }

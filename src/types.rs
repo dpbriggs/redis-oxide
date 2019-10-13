@@ -10,6 +10,7 @@ use tokio::prelude::*;
 use parking_lot::Mutex;
 use std::fs::File;
 
+use crate::blocking::WakerStore;
 use crate::data_structures::sorted_set::SortedSet;
 
 /// These types are used by state and ops to actually perform useful work.
@@ -130,26 +131,29 @@ type KeyZSet = HashMap<Key, SortedSet>;
 /// Canonical type for Key-Bloom storage.
 type KeyBloom = HashMap<Key, GrowableBloom>;
 
+pub type StateRef = Arc<State>;
 /// The state stored by redis-oxide. These fields are the ones
 /// used by the various datastructure files (keys.rs, etc)
-#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize)]
 pub struct State {
     #[serde(default)]
-    pub kv: Arc<RwLock<KeyString>>,
+    pub kv: RwLock<KeyString>,
     #[serde(default)]
-    pub sets: Arc<RwLock<KeySet>>,
+    pub sets: RwLock<KeySet>,
     #[serde(default)]
-    pub lists: Arc<RwLock<KeyList>>,
+    pub lists: RwLock<KeyList>,
     #[serde(default)]
-    pub hashes: Arc<RwLock<KeyHash>>,
+    pub hashes: RwLock<KeyHash>,
     #[serde(default)]
-    pub zsets: Arc<RwLock<KeyZSet>>,
+    pub zsets: RwLock<KeyZSet>,
     #[serde(default)]
-    pub blooms: Arc<RwLock<KeyBloom>>,
+    pub blooms: RwLock<KeyBloom>,
     #[serde(skip)]
-    pub commands_ran: Arc<AtomicU64>,
+    pub commands_ran: AtomicU64,
     #[serde(skip)]
     pub commands_threshold: u64,
+    #[serde(skip)]
+    pub list_wakers: Mutex<WakerStore>,
 }
 
 /// Mapping of a ReturnValue to a RedisValue.
@@ -173,5 +177,5 @@ impl From<ReturnValue> for RedisValue {
 
 /// StateInteration is how Operations interact with State.
 pub trait StateInteration {
-    fn interact(self, state: State) -> InteractionRes;
+    fn interact(self, state: StateRef) -> InteractionRes;
 }

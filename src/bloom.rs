@@ -1,5 +1,5 @@
 use crate::make_reader;
-use crate::types::{InteractionRes, Key, ReturnValue, State, StateInteration, Value};
+use crate::types::{InteractionRes, Key, ReturnValue, StateInteration, StateRef, Value};
 use growable_bloom_filter::GrowableBloom;
 
 #[derive(Debug, Clone)]
@@ -15,7 +15,7 @@ const EST_INSERTS: usize = 10;
 make_reader!(blooms, read_blooms);
 
 impl StateInteration for BloomOps {
-    fn interact(self, state: State) -> InteractionRes {
+    fn interact(self, state: StateRef) -> InteractionRes {
         match self {
             BloomOps::BInsert(bloom_key, value) => {
                 let mut blooms = state.blooms.write();
@@ -35,14 +35,16 @@ impl StateInteration for BloomOps {
 #[cfg(test)]
 mod test_bloom {
     use crate::bloom::BloomOps;
+    use crate::types::StateInteration;
     use crate::types::{InteractionRes, Key, ReturnValue, State, Value};
     use proptest::prelude::*;
+    use std::sync::Arc;
 
     proptest! {
         #[test]
         fn test_insert(key: Key, v: Value) {
-            let eng = State::default();
-            let res = eng.clone().exec_op(BloomOps::BInsert(key, v));
+            let eng = Arc::new(State::default());
+            let res = BloomOps::BInsert(key, v).interact(eng.clone());
             if let InteractionRes::Immediate(e) = res {
                 assert_eq!(e, ReturnValue::Ok);
             } else {
@@ -51,21 +53,20 @@ mod test_bloom {
         }
         #[test]
         fn test_contains(key: Key, v: Value) {
-            let eng = State::default();
-            let res = eng.clone().exec_op(BloomOps::BContains(key.clone(), v.clone()));
+            let eng = Arc::new(State::default());
+            let res = BloomOps::BContains(key.clone(), v.clone()).interact(eng.clone());
             if let InteractionRes::Immediate(e) = res {
                 assert_eq!(e, ReturnValue::IntRes(0));
             } else {
                 panic!("Should have returned immediate!")
             }
-            eng.clone().exec_op(BloomOps::BInsert(key.clone(), v.clone()));
-            let res = eng.clone().exec_op(BloomOps::BContains(key, v));
+            BloomOps::BInsert(key.clone(), v.clone()).interact(eng.clone());
+            let res = BloomOps::BContains(key, v).interact(eng.clone());
             if let InteractionRes::Immediate(e) = res {
                 assert_eq!(e, ReturnValue::IntRes(1));
             } else {
                 panic!("Should have returned immediate!")
             }
-
         }
     }
 }

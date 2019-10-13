@@ -8,7 +8,7 @@ use crate::lists::ListOps;
 use crate::misc::MiscOps;
 use crate::sets::SetOps;
 use crate::sorted_sets::ZSetOps;
-use crate::types::{InteractionRes, State, StateInteration};
+use crate::types::{InteractionRes, StateInteration, StateRef};
 
 use crate::types::{
     Count, Index, Key, RedisValue, Score, Value, EMPTY_ARRAY, NULL_ARRAY, NULL_BULK_STRING,
@@ -26,7 +26,7 @@ pub enum Ops {
 }
 
 impl StateInteration for Ops {
-    fn interact(self, state: State) -> InteractionRes {
+    fn interact(self, state: StateRef) -> InteractionRes {
         match self {
             Ops::Keys(op) => op.interact(state),
             Ops::Sets(op) => op.interact(state),
@@ -467,6 +467,11 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
             verify_size(&tail, 1)?;
             let key = Key::try_from(tail[0])?;
             ok!(ListOps::BLPop(key))
+        }
+        "brpop" => {
+            verify_size(&tail, 1)?;
+            let key = Key::try_from(tail[0])?;
+            ok!(ListOps::BRPop(key))
         }
         "rpop" => {
             verify_size(&tail, 1)?;

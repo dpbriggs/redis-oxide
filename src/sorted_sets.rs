@@ -1,4 +1,6 @@
-use crate::types::{Count, Index, InteractionRes, Key, ReturnValue, Score, State, StateInteration};
+use crate::types::{
+    Count, Index, InteractionRes, Key, ReturnValue, Score, StateInteration, StateRef,
+};
 use crate::{make_reader, make_writer};
 
 /// ZSet Ops
@@ -25,7 +27,7 @@ fn deal_with_negative_indices(coll_size: Count, bounds: (Index, Index)) -> (Inde
 }
 
 impl StateInteration for ZSetOps {
-    fn interact(self, state: State) -> InteractionRes {
+    fn interact(self, state: StateRef) -> InteractionRes {
         match self {
             ZSetOps::ZAdd(zset_key, member_scores) => {
                 state.create_zset_if_necessary(&zset_key);

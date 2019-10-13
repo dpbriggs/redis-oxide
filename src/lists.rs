@@ -1,5 +1,7 @@
-use crate::blocking::NilBlocking;
-use crate::types::{Count, Index, InteractionRes, Key, ReturnValue, State, StateInteration, Value};
+use crate::blocking::KeyBlocking;
+use crate::types::{
+    Count, Index, InteractionRes, Key, ReturnValue, StateInteration, StateRef, Value,
+};
 use crate::{make_reader, make_writer};
 use std::collections::VecDeque;
 
@@ -19,6 +21,7 @@ pub enum ListOps {
     RPushX(Key, Value),
     RPopLPush(Key, Key),
     BLPop(Key),
+    BRPop(Key),
 }
 
 make_reader!(lists, read_lists);
@@ -26,14 +29,15 @@ make_writer!(lists, write_lists);
 
 impl StateInteration for ListOps {
     #[allow(clippy::cognitive_complexity)]
-    fn interact(self, state: State) -> InteractionRes {
+    fn interact(self, state: StateRef) -> InteractionRes {
         match self {
             ListOps::LPush(key, vals) => {
                 state.create_list_if_necessary(&key);
                 write_lists!(state, &key, list);
                 for val in vals {
-                    list.push_front(val)
+                    list.push_front(val);
                 }
+                state.wake_list(&key);
                 ReturnValue::IntRes(list.len() as Count).into()
             }
             ListOps::LPushX(key, val) => {
@@ -43,6 +47,7 @@ impl StateInteration for ListOps {
                 state.create_list_if_necessary(&key);
                 write_lists!(state, &key, list);
                 list.push_front(val);
+                state.wake_list(&key);
                 ReturnValue::IntRes(list.len() as Count).into()
             }
             ListOps::LLen(key) => match read_lists!(state, &key) {
@@ -72,6 +77,7 @@ impl StateInteration for ListOps {
                 state.create_list_if_necessary(&key);
                 write_lists!(state, &key, list);
                 list.push_back(val);
+                state.wake_list(&key);
                 ReturnValue::IntRes(list.len() as Count).into()
             }
             ListOps::LIndex(key, index) => match write_lists!(state, &key) {
@@ -164,6 +170,7 @@ impl StateInteration for ListOps {
                                 source_list.push_back(value.clone());
                             } else {
                                 lists.get_mut(&dest).unwrap().push_back(value.clone());
+                                state.wake_list(&dest);
                             }
                             ReturnValue::StringRes(value).into()
                         }
@@ -171,19 +178,24 @@ impl StateInteration for ListOps {
                 }
             }
             ListOps::BLPop(key) => {
-                // ListOps::LPop(key) => match write_lists!(state, &key).and_then(VecDeque::pop_front) {
-                //     Some(v) => ReturnValue::StringRes(v).into(),
-                //     None => ReturnValue::Nil.into(),
-                // },
-
-                // let key_copy = key.clone();
-                // let state_ptr = state.clone();
-                let bl = move || match write_lists!(state, &key).and_then(VecDeque::pop_front) {
-                    Some(v) => Some(ReturnValue::StringRes(v)),
-                    None => None,
+                let state_clone = state.clone();
+                let key_clone = key.clone();
+                let bl = move || {
+                    write_lists!(state, &key)
+                        .and_then(VecDeque::pop_front)
+                        .map(ReturnValue::StringRes)
                 };
-                NilBlocking::interaction_res(Box::new(bl))
-                // InteractionRes::Blocking(Box::new(NilBlocking::new(Box::new(bl))))
+                KeyBlocking::interaction_res(Box::new(bl), state_clone, key_clone)
+            }
+            ListOps::BRPop(key) => {
+                let state_clone = state.clone();
+                let key_clone = key.clone();
+                let bl = move || {
+                    write_lists!(state, &key)
+                        .and_then(VecDeque::pop_back)
+                        .map(ReturnValue::StringRes)
+                };
+                KeyBlocking::interaction_res(Box::new(bl), state_clone, key_clone)
             }
         }
     }
