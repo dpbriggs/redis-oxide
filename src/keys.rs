@@ -157,4 +157,27 @@ mod test_keys {
             assert_eq(ir(ReturnValue::StringRes(v.clone())), KeyOps::Get(new).interact(eng.clone()));
         }
     }
+    mod bench {
+        use crate::keys::KeyOps;
+        use crate::types::{State, StateInteration};
+        use std::sync::Arc;
+        use test::Bencher;
+        #[bench]
+        fn set_key(b: &mut Bencher) {
+            let eng = Arc::new(State::default());
+            b.iter(|| KeyOps::Set(b"foo".to_vec(), b"bar".to_vec()).interact(eng.clone()));
+        }
+        #[bench]
+        fn set_key_large(b: &mut Bencher) {
+            let eng = Arc::new(State::default());
+            let key: Vec<u8> = "X".repeat(10000).as_bytes().to_vec();
+            b.iter(|| KeyOps::Set(b"foo".to_vec(), key.clone()).interact(eng.clone()));
+        }
+        #[bench]
+        fn get_key(b: &mut Bencher) {
+            let eng = Arc::new(State::default());
+            KeyOps::Set(b"foo".to_vec(), b"bar".to_vec()).interact(eng.clone());
+            b.iter(|| KeyOps::Get(b"foo".to_vec()).interact(eng.clone()));
+        }
+    }
 }

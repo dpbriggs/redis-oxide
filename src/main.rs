@@ -1,4 +1,7 @@
 #![deny(unsafe_code)]
+#![feature(test)]
+
+extern crate test;
 
 #[macro_use]
 extern crate serde_derive;
@@ -35,7 +38,6 @@ mod types;
 
 use self::database::{get_dump_file, load_state};
 use self::logger::LOGGER;
-// use self::server::server;
 use self::startup::{startup_message, Config};
 use self::server::socket_listener;
 use self::database::save_state_interval;

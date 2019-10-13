@@ -232,7 +232,6 @@ mod async_resp_tests {
     use crate::asyncresp::RedisValueCodec;
     use crate::types::{RedisValue, Value};
     use bytes::BytesMut;
-    // use futures::{Future, Stream};
     use pretty_assertions::assert_eq;
     use proptest::collection::vec;
     use proptest::prelude::*;
@@ -254,12 +253,10 @@ mod async_resp_tests {
                 BytesMut::from(&input[second..]),
             ];
 
+            // Only care that it doesn't crash.
             let mut decoder = RedisValueCodec::default();
             let _ = decoder.decode(&mut seq[0]);
             let _ = decoder.decode(&mut seq[1]);
-
-            // Only care that it doesn't crash.
-            // FramedRead::new(partial_reader, decoder).collect().wait().unwrap_or(vec![RedisValue::NullArray]);
         }
 
     }
@@ -310,6 +307,7 @@ mod async_resp_tests {
                 Ok(Some(value)) => {
                     res.push(value);
                 }
+                Err(e) => panic!("Should not error, {:?}", e),
                 _ => break,
             }
         }
@@ -318,6 +316,7 @@ mod async_resp_tests {
                 Ok(Some(value)) => {
                     res.push(value);
                 }
+                Err(e) => panic!("Should not error, {:?}", e),
                 _ => break,
             }
         }

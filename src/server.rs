@@ -5,14 +5,13 @@ use crate::logger::LOGGER;
 use crate::{
     ops::translate,
     startup::Config,
-    types::{DumpFile, InteractionRes, RedisValue, State, StateRef},
+    types::{DumpFile, InteractionRes, RedisValue, StateRef},
 };
 use std::net::SocketAddr;
 use std::sync::atomic::Ordering;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::*;
 use tokio_codec::Decoder;
-use std::sync::Arc;
 use crate::types::StateInteration;
 
 fn save_if_required(state: StateRef, dump_file: DumpFile) {
@@ -33,6 +32,11 @@ fn save_if_required(state: StateRef, dump_file: DumpFile) {
 }
 
 
+/// Spawn a RESP handler for the given socket.
+///
+/// This will synchronously process requests / responses for this
+/// connection only. Other connections will be spread across the
+/// thread pool.
 async fn process(socket: TcpStream, state: StateRef, dump_file: DumpFile) {
     tokio::spawn(async move {
         // let mut framed = RedisValueCodec::default().framed(socket);
@@ -78,7 +82,7 @@ async fn process(socket: TcpStream, state: StateRef, dump_file: DumpFile) {
 
 /// The listener for redis-oxide. Accepts connections and spawns handlers.
 pub async fn socket_listener(
-    state: Arc<State>,
+    state: StateRef,
     dump_file: DumpFile,
     config: Config,
 ) {
