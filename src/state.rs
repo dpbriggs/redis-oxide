@@ -1,8 +1,8 @@
 // use rand::Rng;
-use crate::types::StateInteration;
-use crate::types::{InteractionRes, ReturnValue, State};
+use crate::types::{ReturnValue, State};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
+use std::task::Waker;
 
 impl fmt::Display for ReturnValue {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -52,7 +52,13 @@ impl State {
         }
     }
 
-    pub fn exec_op<T: StateInteration>(self, action: T) -> InteractionRes {
-        action.interact(self)
+    pub fn wake_list(&self, list_key: &[u8]) {
+        let mut list_wakers = self.list_wakers.lock();
+        list_wakers.wake(&list_key);
+    }
+
+    pub fn sleep_list(&self, list_key: &[u8], waker: Waker) {
+        let mut list_wakers = self.list_wakers.lock();
+        list_wakers.add(&list_key, waker);
     }
 }

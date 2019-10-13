@@ -1,30 +1,52 @@
-use crate::types::{InteractionRes, ReturnValue};
+use crate::types::{InteractionRes, Key, ReturnValue, StateRef};
 
-use futures::future::Future;
-use futures::{Async, Poll};
+use std::collections::HashMap;
+use std::future::Future;
+use std::pin::Pin;
+use std::task::Waker;
+use std::task::{Context, Poll};
 
-pub struct NilBlocking(Box<dyn Fn() -> Option<ReturnValue> + Send>);
+#[derive(Default, Debug)]
+pub struct WakerStore {
+    wakers: HashMap<Key, Vec<Waker>>,
+}
 
-impl NilBlocking {
-    #[allow(dead_code)] // We don't have blocking atm
-    pub fn new(checker: Box<dyn Fn() -> Option<ReturnValue> + Send>) -> NilBlocking {
-        NilBlocking(checker)
+impl WakerStore {
+    pub fn add(&mut self, key: &[u8], waker: Waker) {
+        self.wakers.entry(key.to_vec()).or_default().push(waker);
     }
-    pub fn interaction_res(checker: Box<dyn Fn() -> Option<ReturnValue> + Send>) -> InteractionRes {
-        InteractionRes::Blocking(Box::new(NilBlocking(checker)))
+
+    pub fn wake(&mut self, key: &[u8]) {
+        self.wakers
+            .get_mut(key)
+            .map(|vec| vec.pop().map(|wake| wake.wake()));
     }
 }
 
-impl Future for NilBlocking {
-    type Item = ReturnValue;
-    type Error = ();
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        match self.0() {
-            Some(res) => Ok(Async::Ready(res)),
+pub struct KeyBlocking {
+    f: Box<dyn Fn() -> Option<ReturnValue> + Send>,
+    state: StateRef,
+    key: Key,
+}
+
+impl KeyBlocking {
+    pub fn interaction_res(
+        f: Box<dyn Fn() -> Option<ReturnValue> + Send>,
+        state: StateRef,
+        key: Key,
+    ) -> InteractionRes {
+        InteractionRes::Blocking(Box::new(KeyBlocking { f, state, key }))
+    }
+}
+
+impl Future for KeyBlocking {
+    type Output = ReturnValue;
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+        match (self.f)() {
+            Some(ret) => Poll::Ready(ret),
             None => {
-                use crate::logger::LOGGER;
-                info!(LOGGER, "here");
-                Ok(Async::NotReady)
+                self.state.sleep_list(&self.key, cx.waker().clone());
+                Poll::Pending
             }
         }
     }

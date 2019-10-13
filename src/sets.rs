@@ -1,4 +1,4 @@
-use crate::types::{Count, InteractionRes, Key, ReturnValue, State, StateInteration, Value};
+use crate::types::{Count, InteractionRes, Key, ReturnValue, StateInteration, StateRef, Value};
 use std::collections::HashSet;
 
 #[derive(Debug, Clone)]
@@ -29,7 +29,7 @@ pub enum SetAction {
 make_reader!(sets, read_sets);
 make_writer!(sets, write_sets);
 
-fn many_set_op(state: &State, keys: Vec<Key>, op: SetAction) -> Option<HashSet<Value>> {
+fn many_set_op(state: &StateRef, keys: Vec<Key>, op: SetAction) -> Option<HashSet<Value>> {
     let state_sets = write_sets!(state);
     let sets: Vec<HashSet<Key>> = keys
         .iter()
@@ -51,7 +51,7 @@ fn many_set_op(state: &State, keys: Vec<Key>, op: SetAction) -> Option<HashSet<V
 }
 
 impl StateInteration for SetOps {
-    fn interact(self, state: State) -> InteractionRes {
+    fn interact(self, state: StateRef) -> InteractionRes {
         match self {
             SetOps::SAdd(set_key, vals) => {
                 state.create_set_if_necessary(&set_key);

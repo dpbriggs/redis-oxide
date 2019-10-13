@@ -1,4 +1,4 @@
-use crate::types::{Count, InteractionRes, Key, ReturnValue, State, StateInteration, Value};
+use crate::types::{Count, InteractionRes, Key, ReturnValue, StateInteration, StateRef, Value};
 use crate::{make_reader, make_writer};
 use std::collections::hash_map::Entry;
 
@@ -30,7 +30,7 @@ make_reader!(hashes, read_hashes);
 make_writer!(hashes, write_hashes);
 
 impl StateInteration for HashOps {
-    fn interact(self, state: State) -> InteractionRes {
+    fn interact(self, state: StateRef) -> InteractionRes {
         match self {
             HashOps::HGet(key, field) => read_hashes!(state)
                 .get(&key)

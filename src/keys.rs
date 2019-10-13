@@ -1,4 +1,4 @@
-use crate::types::{Count, InteractionRes, Key, ReturnValue, State, StateInteration, Value};
+use crate::types::{Count, InteractionRes, Key, ReturnValue, StateInteration, StateRef, Value};
 
 // use futures::future::Future;
 // use futures::future::IntoFuture;
@@ -19,7 +19,7 @@ pub enum KeyOps {
 }
 
 impl StateInteration for KeyOps {
-    fn interact(self, state: State) -> InteractionRes {
+    fn interact(self, state: StateRef) -> InteractionRes {
         match self {
             KeyOps::Get(key) => state
                 .kv
@@ -104,13 +104,10 @@ impl StateInteration for KeyOps {
 #[cfg(test)]
 mod test_keys {
     use crate::keys::KeyOps;
-    use crate::ops::Ops;
+    use crate::types::StateInteration;
     use crate::types::{InteractionRes, ReturnValue, State, Value};
     use proptest::prelude::*;
-
-    fn gp(k: KeyOps) -> Ops {
-        Ops::Keys(k)
-    }
+    use std::sync::Arc;
 
     fn ir(k: ReturnValue) -> InteractionRes {
         InteractionRes::Immediate(k)
@@ -131,32 +128,56 @@ mod test_keys {
     proptest! {
         #[test]
         fn test_get(v: Value) {
-            let eng = State::default();
-            assert_eq(ir(ReturnValue::Nil), eng.clone().exec_op(gp(KeyOps::Get(v.clone()))));
-            eng.clone().exec_op(gp(KeyOps::Set(v.clone(), v.clone())));
-            assert_eq(ir(ReturnValue::StringRes(v.clone())), eng.exec_op(gp(KeyOps::Get(v.clone()))));
+            let eng = Arc::new(State::default());
+            assert_eq(ir(ReturnValue::Nil), KeyOps::Get(v.clone()).interact(eng.clone()));
+            KeyOps::Set(v.clone(), v.clone()).interact(eng.clone());
+            assert_eq(ir(ReturnValue::StringRes(v.clone())), KeyOps::Get(v.clone()).interact(eng.clone()));
         }
         #[test]
         fn test_set(l: Value, r: Value) {
-            let eng = State::default();
-            eng.clone().exec_op(gp(KeyOps::Set(l.clone(), r.clone())));
-            assert_eq(ir(ReturnValue::StringRes(r.clone())), eng.exec_op(gp(KeyOps::Get(l.clone()))));
+            let eng = Arc::new(State::default());
+            KeyOps::Set(l.clone(), r.clone()).interact(eng.clone());
+            assert_eq(ir(ReturnValue::StringRes(r.clone())), KeyOps::Get(l.clone()).interact(eng.clone()));
         }
         #[test]
         fn test_del(l: Value, unused: Value) {
-            let eng = State::default();
-            eng.clone().exec_op(gp(KeyOps::Set(l.clone(), l.clone())));
-            assert_eq(ir(ReturnValue::IntRes(1)), eng.clone().exec_op(gp(KeyOps::Del(vec![l.clone()]))));
-            assert_eq(ir(ReturnValue::IntRes(0)), eng.exec_op(gp(KeyOps::Del(vec![unused]))));
+            let eng = Arc::new(State::default());
+            KeyOps::Set(l.clone(), l.clone()).interact(eng.clone());
+
+            assert_eq(ir(ReturnValue::IntRes(1)), KeyOps::Del(vec![l.clone()]).interact(eng.clone()));
+            assert_eq(ir(ReturnValue::IntRes(0)), KeyOps::Del(vec![unused]).interact(eng.clone()));
         }
         #[test]
         fn test_rename(old: Value, v: Value, new: Value) {
-            let eng = State::default();
-            eng.clone().exec_op(gp(KeyOps::Set(old.clone(), v.clone())));
+            let eng = Arc::new(State::default());
+            KeyOps::Set(old.clone(), v.clone()).interact(eng.clone());
             // TODO: Make testing Exec_OpionRes tractable
             // assert(ir(eng.clone().exec_op(gp(KeyOps::Rename(new.clone()), old.clone()))).is_error());
-            eng.clone().exec_op(gp(KeyOps::Rename(old.clone(), new.clone())));
-            assert_eq(ir(ReturnValue::StringRes(v.clone())), eng.clone().exec_op(gp(KeyOps::Get(new))));
+            KeyOps::Rename(old.clone(), new.clone()).interact(eng.clone());
+            assert_eq(ir(ReturnValue::StringRes(v.clone())), KeyOps::Get(new).interact(eng.clone()));
+        }
+    }
+    mod bench {
+        use crate::keys::KeyOps;
+        use crate::types::{State, StateInteration};
+        use std::sync::Arc;
+        use test::Bencher;
+        #[bench]
+        fn set_key(b: &mut Bencher) {
+            let eng = Arc::new(State::default());
+            b.iter(|| KeyOps::Set(b"foo".to_vec(), b"bar".to_vec()).interact(eng.clone()));
+        }
+        #[bench]
+        fn set_key_large(b: &mut Bencher) {
+            let eng = Arc::new(State::default());
+            let key: Vec<u8> = "X".repeat(10000).as_bytes().to_vec();
+            b.iter(|| KeyOps::Set(b"foo".to_vec(), key.clone()).interact(eng.clone()));
+        }
+        #[bench]
+        fn get_key(b: &mut Bencher) {
+            let eng = Arc::new(State::default());
+            KeyOps::Set(b"foo".to_vec(), b"bar".to_vec()).interact(eng.clone());
+            b.iter(|| KeyOps::Get(b"foo".to_vec()).interact(eng.clone()));
         }
     }
 }
