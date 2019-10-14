@@ -7,7 +7,7 @@ use std::pin::Pin;
 use std::task::Waker;
 use std::task::{Context, Poll};
 
-type YieldingFn = Box<dyn Fn() -> Option<ReturnValue> + Send>;
+pub type YieldingFn = Box<dyn Fn() -> Option<ReturnValue> + Send>;
 
 #[derive(Default, Debug)]
 pub struct WakerStore {

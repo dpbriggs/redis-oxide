@@ -13,6 +13,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::*;
 use tokio_codec::Decoder;
 use crate::types::StateInteration;
+use crate::ops::op_interact;
 
 fn save_if_required(state: StateRef, dump_file: DumpFile) {
     state.commands_ran.fetch_add(1, Ordering::SeqCst);
@@ -49,7 +50,7 @@ async fn process(socket: TcpStream, state: StateRef, dump_file: DumpFile) {
                 Ok(op) => {
                     debug!(LOGGER, "running op {:?}", op.clone());
                     // Step 1: Execute the operation the operation (from translate above)
-                    let res = match op.interact(state.clone()) {
+                    let res = match op_interact(op, state.clone()).await {
                         InteractionRes::Immediate(r) => RedisValue::from(r),
                         InteractionRes::ImmediateWithWork(r, w) => {
                             tokio::spawn(w);

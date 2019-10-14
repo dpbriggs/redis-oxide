@@ -24,9 +24,9 @@ pub type Index = i64;
 /// Score is used in sorted sets
 pub type Score = i64;
 /// Timeout unit
-pub type Timeout = i64;
+pub type UTimeout = i64;
 
-/// DumpFile type alias.
+/// DumpTimeoutUnitpe alias.
 pub type DumpFile = Arc<Mutex<File>>;
 
 /// RedisValue is the canonical type for values flowing

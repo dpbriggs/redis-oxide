@@ -4,14 +4,14 @@ use std::fmt::Debug;
 use crate::bloom::BloomOps;
 use crate::hashes::HashOps;
 use crate::keys::KeyOps;
-use crate::lists::ListOps;
+use crate::lists::{ListOps, list_interact};
 use crate::misc::MiscOps;
 use crate::sets::SetOps;
 use crate::sorted_sets::ZSetOps;
-use crate::types::{InteractionRes, StateInteration, StateRef};
+use crate::types::{InteractionRes, StateInteration, StateRef, };
 
 use crate::types::{
-    Count, Index, Key, RedisValue, Score, Timeout, Value, EMPTY_ARRAY, NULL_ARRAY, NULL_BULK_STRING,
+    Count, Index, Key, RedisValue, Score, UTimeout, Value, EMPTY_ARRAY, NULL_ARRAY, NULL_BULK_STRING,
 };
 
 #[derive(Debug, Clone)]
@@ -23,6 +23,18 @@ pub enum Ops {
     Hashes(HashOps),
     ZSets(ZSetOps),
     Blooms(BloomOps),
+}
+
+pub async fn op_interact(op: Ops, state: StateRef) -> InteractionRes {
+    match op {
+        Ops::Keys(op) => op.interact(state),
+        Ops::Sets(op) => op.interact(state),
+        Ops::Lists(op) => list_interact(op, state).await,
+        Ops::Misc(op) => op.interact(state),
+        Ops::Hashes(op) => op.interact(state),
+        Ops::ZSets(op) => op.interact(state),
+        Ops::Blooms(op) => op.interact(state),
+    }
 }
 
 impl StateInteration for Ops {
@@ -466,7 +478,7 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
         "blpop" => {
             verify_size(&tail, 2)?;
             let key = Key::try_from(tail[0])?;
-            let timeout = Timeout::try_from(tail[1])?;
+            let timeout = UTimeout::try_from(tail[1])?;
             ok!(ListOps::BLPop(key, timeout))
         }
         "brpop" => {
