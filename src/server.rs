@@ -39,7 +39,6 @@ fn save_if_required(state: StateRef, dump_file: DumpFile) {
 /// thread pool.
 async fn process(socket: TcpStream, state: StateRef, dump_file: DumpFile) {
     tokio::spawn(async move {
-        // let mut framed = RedisValueCodec::default().framed(socket);
         let (mut tx, mut rx) = RedisValueCodec::default().framed(socket).split();
         while let Some(redis_value) = rx.next().await {
             if let Err(e) = redis_value {

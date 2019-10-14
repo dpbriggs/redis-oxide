@@ -1,2 +1,2 @@
-mod receipt_map;
+pub mod receipt_map;
 pub mod sorted_set;

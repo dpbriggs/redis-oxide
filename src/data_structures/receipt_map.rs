@@ -1,29 +1,63 @@
+use seahash::hash;
 use std::collections::HashMap;
+use std::collections::HashSet;
+use std::task::Waker;
 
-type Receipt = u32;
+pub type Receipt = u32;
 
-#[derive(Default, Debug)]
-struct RecieptMap<T> {
-    counter: Receipt,
-    holder: HashMap<Receipt, T>,
+#[derive(Hash, Debug, PartialEq, Eq)]
+pub enum KeyTypes {
+    List(u64),
 }
 
-impl<T: Default> RecieptMap<T> {
-    fn new() -> RecieptMap<T> {
-        Default::default()
+impl KeyTypes {
+    pub fn list(key: &[u8]) -> KeyTypes {
+        KeyTypes::List(hash(key))
     }
+}
 
-    fn insert(&mut self, item: T) -> Receipt {
+#[derive(Default, Debug)]
+pub struct RecieptMap {
+    counter: Receipt,
+    wakers: HashMap<Receipt, Waker>,
+    timed_out: HashSet<Receipt>,
+    keys: HashMap<KeyTypes, Vec<Receipt>>,
+}
+
+impl RecieptMap {
+    pub fn get_receipt(&mut self) -> Receipt {
         self.counter += 1;
-        self.holder.insert(self.counter, item);
         self.counter
     }
 
-    fn return_receipt(&mut self, receipt: Receipt) -> Option<T> {
-        self.holder.remove(&receipt)
+    pub fn insert(&mut self, receipt: Receipt, item: Waker, key: KeyTypes) {
+        self.wakers.insert(receipt, item);
+        self.keys.entry(key).or_default().push(receipt);
     }
-}
 
-struct KeyWake {
-    state: u32,
+    pub fn receipt_timed_out(&self, receipt: Receipt) -> bool {
+        self.timed_out.contains(&receipt)
+    }
+
+    pub fn wake_with_key(&mut self, key: KeyTypes) {
+        let v = self.keys.get_mut(&key);
+        if v.is_none() {
+            return;
+        }
+        let v = v.unwrap();
+        while let Some(receipt) = v.pop() {
+            match self.wakers.remove(&receipt) {
+                Some(waker) => {
+                    waker.wake();
+                    break;
+                }
+                None => continue,
+            };
+        }
+    }
+
+    pub fn timeout_receipt(&mut self, receipt: Receipt) {
+        self.timed_out.insert(receipt);
+        self.wakers.remove(&receipt).map(|waker| waker.wake());
+    }
 }

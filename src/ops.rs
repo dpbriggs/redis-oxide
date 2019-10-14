@@ -11,7 +11,7 @@ use crate::sorted_sets::ZSetOps;
 use crate::types::{InteractionRes, StateInteration, StateRef};
 
 use crate::types::{
-    Count, Index, Key, RedisValue, Score, Value, EMPTY_ARRAY, NULL_ARRAY, NULL_BULK_STRING,
+    Count, Index, Key, RedisValue, Score, Timeout, Value, EMPTY_ARRAY, NULL_ARRAY, NULL_BULK_STRING,
 };
 
 #[derive(Debug, Clone)]
@@ -464,9 +464,10 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
             ok!(ListOps::LPop(key))
         }
         "blpop" => {
-            verify_size(&tail, 1)?;
+            verify_size(&tail, 2)?;
             let key = Key::try_from(tail[0])?;
-            ok!(ListOps::BLPop(key))
+            let timeout = Timeout::try_from(tail[1])?;
+            ok!(ListOps::BLPop(key, timeout))
         }
         "brpop" => {
             verify_size(&tail, 1)?;

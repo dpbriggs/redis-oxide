@@ -1,5 +1,5 @@
 #![deny(unsafe_code)]
-#![feature(test)]
+#![feature(test, async_closure)]
 
 extern crate test;
 
@@ -35,6 +35,7 @@ mod sorted_sets;
 mod startup;
 mod state;
 mod types;
+mod timeouts;
 
 use self::database::{get_dump_file, load_state};
 use self::logger::LOGGER;

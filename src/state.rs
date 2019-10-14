@@ -1,8 +1,8 @@
 // use rand::Rng;
+use crate::data_structures::receipt_map::{KeyTypes, Receipt};
 use crate::types::{ReturnValue, State};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
-use std::task::Waker;
 
 impl fmt::Display for ReturnValue {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -52,13 +52,18 @@ impl State {
         }
     }
 
-    pub fn wake_list(&self, list_key: &[u8]) {
-        let mut list_wakers = self.list_wakers.lock();
-        list_wakers.wake(&list_key);
+    pub fn get_receipt(&self) -> Receipt {
+        let mut rm = self.reciept_map.lock();
+        rm.get_receipt()
     }
 
-    pub fn sleep_list(&self, list_key: &[u8], waker: Waker) {
-        let mut list_wakers = self.list_wakers.lock();
-        list_wakers.add(&list_key, waker);
+    pub fn receipt_timed_out(&self, receipt: Receipt) -> bool {
+        let rm = self.reciept_map.lock();
+        rm.receipt_timed_out(receipt)
+    }
+
+    pub fn wake_list(&self, list_key: &[u8]) {
+        let mut rm = self.reciept_map.lock();
+        rm.wake_with_key(KeyTypes::list(list_key));
     }
 }

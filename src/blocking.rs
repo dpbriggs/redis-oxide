@@ -1,3 +1,4 @@
+use crate::data_structures::receipt_map::{KeyTypes, Receipt};
 use crate::types::{InteractionRes, Key, ReturnValue, StateRef};
 
 use std::collections::HashMap;
@@ -6,46 +7,55 @@ use std::pin::Pin;
 use std::task::Waker;
 use std::task::{Context, Poll};
 
+type YieldingFn = Box<dyn Fn() -> Option<ReturnValue> + Send>;
+
 #[derive(Default, Debug)]
 pub struct WakerStore {
     wakers: HashMap<Key, Vec<Waker>>,
-}
-
-impl WakerStore {
-    pub fn add(&mut self, key: &[u8], waker: Waker) {
-        self.wakers.entry(key.to_vec()).or_default().push(waker);
-    }
-
-    pub fn wake(&mut self, key: &[u8]) {
-        self.wakers
-            .get_mut(key)
-            .map(|vec| vec.pop().map(|wake| wake.wake()));
-    }
 }
 
 pub struct KeyBlocking {
     f: Box<dyn Fn() -> Option<ReturnValue> + Send>,
     state: StateRef,
     key: Key,
+    receipt: Receipt,
 }
 
 impl KeyBlocking {
+    pub fn new(f: YieldingFn, state: StateRef, key: Key, receipt: Receipt) -> KeyBlocking {
+        KeyBlocking {
+            f,
+            state,
+            key,
+            receipt,
+        }
+    }
     pub fn interaction_res(
-        f: Box<dyn Fn() -> Option<ReturnValue> + Send>,
+        f: YieldingFn,
         state: StateRef,
         key: Key,
+        receipt: Receipt,
     ) -> InteractionRes {
-        InteractionRes::Blocking(Box::new(KeyBlocking { f, state, key }))
+        InteractionRes::Blocking(Box::new(KeyBlocking {
+            f,
+            state,
+            key,
+            receipt,
+        }))
     }
 }
 
 impl Future for KeyBlocking {
     type Output = ReturnValue;
     fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+        if self.state.receipt_timed_out(self.receipt) {
+            return Poll::Ready(ReturnValue::Nil);
+        }
         match (self.f)() {
             Some(ret) => Poll::Ready(ret),
             None => {
-                self.state.sleep_list(&self.key, cx.waker().clone());
+                let mut rm = self.state.reciept_map.lock();
+                rm.insert(self.receipt, cx.waker().clone(), KeyTypes::list(&self.key));
                 Poll::Pending
             }
         }

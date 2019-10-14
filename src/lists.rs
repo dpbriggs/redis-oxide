@@ -1,6 +1,7 @@
 use crate::blocking::KeyBlocking;
+use crate::timeouts::{RecieptTimeOut, TimeoutUnit};
 use crate::types::{
-    Count, Index, InteractionRes, Key, ReturnValue, StateInteration, StateRef, Value,
+    Count, Index, InteractionRes, Key, ReturnValue, StateInteration, StateRef, Timeout, Value,
 };
 use crate::{make_reader, make_writer};
 use std::collections::VecDeque;
@@ -20,12 +21,30 @@ pub enum ListOps {
     RPush(Key, Vec<Value>),
     RPushX(Key, Value),
     RPopLPush(Key, Key),
-    BLPop(Key),
+    BLPop(Key, Timeout),
     BRPop(Key),
 }
 
 make_reader!(lists, read_lists);
 make_writer!(lists, write_lists);
+
+macro_rules! spawn_timeout {
+    ($state:expr, $receipt:expr, $timeout:expr) => {
+        {
+            let __state_clone = $state.clone();
+            let __receipt_clone = $receipt.clone();
+            let __timeout = TimeoutUnit::Seconds($timeout);
+            tokio::spawn(async move {
+                let r = RecieptTimeOut::new(
+                    __receipt_clone,
+                    __state_clone,
+                    __timeout
+                );
+                r.start().await;
+            } );
+        }
+    }
+}
 
 impl StateInteration for ListOps {
     #[allow(clippy::cognitive_complexity)]
@@ -177,25 +196,31 @@ impl StateInteration for ListOps {
                     },
                 }
             }
-            ListOps::BLPop(key) => {
+            ListOps::BLPop(key, timeout) => {
                 let state_clone = state.clone();
                 let key_clone = key.clone();
+                let receipt = state.get_receipt();
+                if timeout > 0 {
+                    spawn_timeout!(state, receipt, timeout);
+                }
                 let bl = move || {
                     write_lists!(state, &key)
                         .and_then(VecDeque::pop_front)
                         .map(ReturnValue::StringRes)
                 };
-                KeyBlocking::interaction_res(Box::new(bl), state_clone, key_clone)
+                // KeyBlocking::new(Box::new(bl), state_clone, key_clone, receipt).await;
+                KeyBlocking::interaction_res(Box::new(bl), state_clone, key_clone, receipt)
             }
             ListOps::BRPop(key) => {
                 let state_clone = state.clone();
                 let key_clone = key.clone();
+                let receipt = state.get_receipt();
                 let bl = move || {
                     write_lists!(state, &key)
                         .and_then(VecDeque::pop_back)
                         .map(ReturnValue::StringRes)
                 };
-                KeyBlocking::interaction_res(Box::new(bl), state_clone, key_clone)
+                KeyBlocking::interaction_res(Box::new(bl), state_clone, key_clone, receipt)
             }
         }
     }

@@ -10,7 +10,7 @@ use tokio::prelude::*;
 use parking_lot::Mutex;
 use std::fs::File;
 
-use crate::blocking::WakerStore;
+use crate::data_structures::receipt_map::RecieptMap;
 use crate::data_structures::sorted_set::SortedSet;
 
 /// These types are used by state and ops to actually perform useful work.
@@ -23,6 +23,8 @@ pub type Count = i64;
 pub type Index = i64;
 /// Score is used in sorted sets
 pub type Score = i64;
+/// Timeout unit
+pub type Timeout = i64;
 
 /// DumpFile type alias.
 pub type DumpFile = Arc<Mutex<File>>;
@@ -153,7 +155,7 @@ pub struct State {
     #[serde(skip)]
     pub commands_threshold: u64,
     #[serde(skip)]
-    pub list_wakers: Mutex<WakerStore>,
+    pub reciept_map: Mutex<RecieptMap>,
 }
 
 /// Mapping of a ReturnValue to a RedisValue.
