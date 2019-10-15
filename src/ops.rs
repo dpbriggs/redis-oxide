@@ -1,14 +1,14 @@
 use std::convert::TryFrom;
 use std::fmt::Debug;
 
-use crate::bloom::BloomOps;
-use crate::hashes::HashOps;
-use crate::keys::KeyOps;
+use crate::bloom::{BloomOps, bloom_interact};
+use crate::hashes::{HashOps, hash_interact};
+use crate::keys::{KeyOps, key_interact};
 use crate::lists::{ListOps, list_interact};
-use crate::misc::MiscOps;
-use crate::sets::SetOps;
-use crate::sorted_sets::ZSetOps;
-use crate::types::{InteractionRes, StateInteration, StateRef, };
+use crate::misc::{MiscOps, misc_interact};
+use crate::sets::{SetOps, set_interact};
+use crate::sorted_sets::{ZSetOps, zset_interact};
+use crate::types::{InteractionRes, StateRef, };
 
 use crate::types::{
     Count, Index, Key, RedisValue, Score, UTimeout, Value, EMPTY_ARRAY, NULL_ARRAY, NULL_BULK_STRING,
@@ -27,27 +27,13 @@ pub enum Ops {
 
 pub async fn op_interact(op: Ops, state: StateRef) -> InteractionRes {
     match op {
-        Ops::Keys(op) => op.interact(state),
-        Ops::Sets(op) => op.interact(state),
+        Ops::Keys(op) => key_interact(op, state).await,
+        Ops::Sets(op) => set_interact(op, state).await,
         Ops::Lists(op) => list_interact(op, state).await,
-        Ops::Misc(op) => op.interact(state),
-        Ops::Hashes(op) => op.interact(state),
-        Ops::ZSets(op) => op.interact(state),
-        Ops::Blooms(op) => op.interact(state),
-    }
-}
-
-impl StateInteration for Ops {
-    fn interact(self, state: StateRef) -> InteractionRes {
-        match self {
-            Ops::Keys(op) => op.interact(state),
-            Ops::Sets(op) => op.interact(state),
-            Ops::Lists(op) => op.interact(state),
-            Ops::Misc(op) => op.interact(state),
-            Ops::Hashes(op) => op.interact(state),
-            Ops::ZSets(op) => op.interact(state),
-            Ops::Blooms(op) => op.interact(state),
-        }
+        Ops::Misc(op) => misc_interact(op, state).await,
+        Ops::Hashes(op) => hash_interact(op, state).await,
+        Ops::ZSets(op) => zset_interact(op, state).await,
+        Ops::Blooms(op) => bloom_interact(op, state).await,
     }
 }
 

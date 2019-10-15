@@ -176,8 +176,3 @@ impl From<ReturnValue> for RedisValue {
         }
     }
 }
-
-/// StateInteration is how Operations interact with State.
-pub trait StateInteration {
-    fn interact(self, state: StateRef) -> InteractionRes;
-}

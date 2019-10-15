@@ -12,7 +12,6 @@ use std::sync::atomic::Ordering;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::*;
 use tokio_codec::Decoder;
-use crate::types::StateInteration;
 use crate::ops::op_interact;
 
 fn save_if_required(state: StateRef, dump_file: DumpFile) {
