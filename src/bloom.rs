@@ -1,5 +1,5 @@
 use crate::make_reader;
-use crate::types::{Key, ReturnValue, StateRef, Value, RedisBool};
+use crate::types::{Key, RedisBool, ReturnValue, StateRef, Value};
 use growable_bloom_filter::GrowableBloom;
 
 #[derive(Debug, Clone)]
@@ -33,7 +33,7 @@ pub async fn bloom_interact(bloom_op: BloomOps, state: StateRef) -> ReturnValue 
 
 #[cfg(test)]
 mod test_bloom {
-    use crate::bloom::{BloomOps, bloom_interact};
+    use crate::bloom::{bloom_interact, BloomOps};
     use crate::types::{ReturnValue, State};
     use std::sync::Arc;
 

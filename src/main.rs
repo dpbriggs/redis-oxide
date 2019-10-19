@@ -34,14 +34,14 @@ mod sets;
 mod sorted_sets;
 mod startup;
 mod state;
-mod types;
 mod timeouts;
+mod types;
 
+use self::database::save_state_interval;
 use self::database::{get_dump_file, load_state};
 use self::logger::LOGGER;
-use self::startup::{startup_message, Config};
 use self::server::socket_listener;
-use self::database::save_state_interval;
+use self::startup::{startup_message, Config};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

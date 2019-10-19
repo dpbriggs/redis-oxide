@@ -1,9 +1,7 @@
-use crate::types::{
-    Count, Index, Key, ReturnValue, StateRef, UTimeout , Value,
-};
+use crate::timeouts::blocking_key_timeout;
+use crate::types::{Count, Index, Key, ReturnValue, StateRef, UTimeout, Value};
 use crate::{make_reader, make_writer};
 use std::collections::VecDeque;
-use crate::timeouts::blocking_key_timeout;
 
 #[derive(Debug, Clone)]
 pub enum ListOps {

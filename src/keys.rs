@@ -82,7 +82,7 @@ pub async fn key_interact(key_op: KeyOps, state: StateRef) -> ReturnValue {
 
 #[cfg(test)]
 mod test_keys {
-    use crate::keys::{KeyOps, key_interact};
+    use crate::keys::{key_interact, KeyOps};
     use crate::types::{ReturnValue, State};
     use std::sync::Arc;
 
@@ -90,9 +90,15 @@ mod test_keys {
     async fn test_get() {
         let v = b"hello".to_vec();
         let eng = Arc::new(State::default());
-        assert_eq!(ReturnValue::Nil, key_interact(KeyOps::Get(v.clone()), eng.clone()).await);
+        assert_eq!(
+            ReturnValue::Nil,
+            key_interact(KeyOps::Get(v.clone()), eng.clone()).await
+        );
         key_interact(KeyOps::Set(v.clone(), v.clone()), eng.clone()).await;
-        assert_eq!(ReturnValue::StringRes(v.clone()), key_interact(KeyOps::Get(v.clone()), eng.clone()).await);
+        assert_eq!(
+            ReturnValue::StringRes(v.clone()),
+            key_interact(KeyOps::Get(v.clone()), eng.clone()).await
+        );
     }
 
     #[tokio::test]
@@ -100,7 +106,10 @@ mod test_keys {
         let (l, r) = (b"l".to_vec(), b"r".to_vec());
         let eng = Arc::new(State::default());
         key_interact(KeyOps::Set(l.clone(), r.clone()), eng.clone()).await;
-        assert_eq!(ReturnValue::StringRes(r.clone()), key_interact(KeyOps::Get(l.clone()), eng.clone()).await);
+        assert_eq!(
+            ReturnValue::StringRes(r.clone()),
+            key_interact(KeyOps::Get(l.clone()), eng.clone()).await
+        );
     }
 
     #[tokio::test]
@@ -109,8 +118,14 @@ mod test_keys {
         let eng = Arc::new(State::default());
         key_interact(KeyOps::Set(l.clone(), l.clone()), eng.clone()).await;
 
-        assert_eq!(ReturnValue::IntRes(1), key_interact(KeyOps::Del(vec![l.clone()]), eng.clone()).await);
-        assert_eq!(ReturnValue::IntRes(0), key_interact(KeyOps::Del(vec![unused]), eng.clone()).await);
+        assert_eq!(
+            ReturnValue::IntRes(1),
+            key_interact(KeyOps::Del(vec![l.clone()]), eng.clone()).await
+        );
+        assert_eq!(
+            ReturnValue::IntRes(0),
+            key_interact(KeyOps::Del(vec![unused]), eng.clone()).await
+        );
     }
 
     #[tokio::test]
@@ -121,37 +136,44 @@ mod test_keys {
         // TODO: Make testing Exec_OpionRes tractable
         // assert(ir(eng.clone().exec_op(gp(KeyOps::Rename(new.clone()), old.clone()))).is_error());
         key_interact(KeyOps::Rename(old.clone(), new.clone()), eng.clone()).await;
-        assert_eq!(ReturnValue::StringRes(v.clone()), key_interact(KeyOps::Get(new), eng.clone()).await);
+        assert_eq!(
+            ReturnValue::StringRes(v.clone()),
+            key_interact(KeyOps::Get(new), eng.clone()).await
+        );
     }
 
     mod bench {
+        use crate::keys::{key_interact, KeyOps};
         use crate::types::State;
         use std::sync::Arc;
         use test::Bencher;
-        use crate::keys::{KeyOps, key_interact};
 
         #[bench]
         fn set_key(b: &mut Bencher) {
             // use tokio::runtime::Runtime;
             let eng = Arc::new(State::default());
-            b.iter(|| async {
-                key_interact(KeyOps::Set(b"foo".to_vec(), b"bar".to_vec()), eng.clone()).await;
+            b.iter(|| {
+                async {
+                    key_interact(KeyOps::Set(b"foo".to_vec(), b"bar".to_vec()), eng.clone()).await;
+                }
             });
         }
         #[bench]
         fn set_key_large(b: &mut Bencher) {
             let eng = Arc::new(State::default());
             let key: Vec<u8> = "X".repeat(10000).as_bytes().to_vec();
-            b.iter(|| async {
-                key_interact(KeyOps::Set(b"foo".to_vec(), key.clone()), eng.clone()).await
+            b.iter(|| {
+                async { key_interact(KeyOps::Set(b"foo".to_vec(), key.clone()), eng.clone()).await }
             });
         }
         #[bench]
         fn get_key(b: &mut Bencher) {
             let eng = Arc::new(State::default());
-            b.iter(|| async {
-                key_interact(KeyOps::Set(b"foo".to_vec(), b"bar".to_vec()), eng.clone()).await;
-                key_interact(KeyOps::Get(b"foo".to_vec()), eng.clone()).await;
+            b.iter(|| {
+                async {
+                    key_interact(KeyOps::Set(b"foo".to_vec(), b"bar".to_vec()), eng.clone()).await;
+                    key_interact(KeyOps::Get(b"foo".to_vec()), eng.clone()).await;
+                }
             });
         }
     }

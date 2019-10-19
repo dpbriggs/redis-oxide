@@ -1,17 +1,18 @@
 use std::convert::TryFrom;
 use std::fmt::Debug;
 
-use crate::bloom::{BloomOps, bloom_interact};
-use crate::hashes::{HashOps, hash_interact};
-use crate::keys::{KeyOps, key_interact};
-use crate::lists::{ListOps, list_interact};
-use crate::misc::{MiscOps, misc_interact};
-use crate::sets::{SetOps, set_interact};
-use crate::sorted_sets::{ZSetOps, zset_interact};
-use crate::types::{ReturnValue, StateRef, };
+use crate::bloom::{bloom_interact, BloomOps};
+use crate::hashes::{hash_interact, HashOps};
+use crate::keys::{key_interact, KeyOps};
+use crate::lists::{list_interact, ListOps};
+use crate::misc::{misc_interact, MiscOps};
+use crate::sets::{set_interact, SetOps};
+use crate::sorted_sets::{zset_interact, ZSetOps};
+use crate::types::{ReturnValue, StateRef};
 
 use crate::types::{
-    Count, Index, Key, RedisValue, Score, UTimeout, Value, EMPTY_ARRAY, NULL_ARRAY, NULL_BULK_STRING,
+    Count, Index, Key, RedisValue, Score, UTimeout, Value, EMPTY_ARRAY, NULL_ARRAY,
+    NULL_BULK_STRING,
 };
 
 #[derive(Debug, Clone)]

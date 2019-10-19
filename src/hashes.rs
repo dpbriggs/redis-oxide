@@ -1,4 +1,4 @@
-use crate::types::{Count, ReturnValue, Key, StateRef, Value};
+use crate::types::{Count, Key, ReturnValue, StateRef, Value};
 use crate::{make_reader, make_writer};
 use std::collections::hash_map::Entry;
 

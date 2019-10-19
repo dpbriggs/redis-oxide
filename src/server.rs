@@ -1,18 +1,18 @@
 /// Server launch file. Starts the services to make redis-oxide work.
 use crate::asyncresp::RedisValueCodec;
-use crate::database::{save_state};
+use crate::database::save_state;
 use crate::logger::LOGGER;
+use crate::ops::op_interact;
 use crate::{
     ops::translate,
     startup::Config,
-    types::{DumpFile, RedisValue, StateRef, ReturnValue},
+    types::{DumpFile, RedisValue, ReturnValue, StateRef},
 };
 use std::net::SocketAddr;
 use std::sync::atomic::Ordering;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::*;
 use tokio_codec::Decoder;
-use crate::ops::op_interact;
 
 fn save_if_required(state: StateRef, dump_file: DumpFile) {
     state.commands_ran.fetch_add(1, Ordering::SeqCst);
@@ -31,7 +31,6 @@ fn save_if_required(state: StateRef, dump_file: DumpFile) {
     }
 }
 
-
 /// Spawn a RESP handler for the given socket.
 ///
 /// This will synchronously process requests / responses for this
@@ -43,7 +42,7 @@ async fn process(socket: TcpStream, state: StateRef, dump_file: DumpFile) {
         while let Some(redis_value) = rx.next().await {
             if let Err(e) = redis_value {
                 error!(LOGGER, "Error recieving redis value {:?}", e);
-                continue
+                continue;
             }
             let res = match translate(&redis_value.unwrap()) {
                 Ok(op) => {
@@ -65,13 +64,8 @@ async fn process(socket: TcpStream, state: StateRef, dump_file: DumpFile) {
     });
 }
 
-
 /// The listener for redis-oxide. Accepts connections and spawns handlers.
-pub async fn socket_listener(
-    state: StateRef,
-    dump_file: DumpFile,
-    config: Config,
-) {
+pub async fn socket_listener(state: StateRef, dump_file: DumpFile, config: Config) {
     // First, get the address determined and parsed.
     let addr_str = format!("{}:{}", "127.0.0.1", config.port);
     let addr = addr_str
@@ -79,15 +73,17 @@ pub async fn socket_listener(
         .expect("Cannot parse address!");
 
     // Second, bind/listen on that address
-    let mut listener = TcpListener::bind(&addr).await.expect("Could not connect to socket!");
+    let mut listener = TcpListener::bind(&addr)
+        .await
+        .expect("Could not connect to socket!");
     info!(LOGGER, "Listening on: {}", addr);
     loop {
         match listener.accept().await {
             Ok((socket, _)) => {
                 debug!(LOGGER, "Accepted connection!");
                 process(socket, state.clone(), dump_file.clone()).await;
-            },
-            Err(e) => error!(LOGGER, "Failed to establish connectin: {:?}", e)
+            }
+            Err(e) => error!(LOGGER, "Failed to establish connectin: {:?}", e),
         };
     }
 }
