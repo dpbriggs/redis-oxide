@@ -10,11 +10,13 @@ use std::io::Seek;
 use std::io::SeekFrom;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::timer::Interval;
 
-const SAVE_STATE_PERIOD: u64 = 60 * 1000;
+const SAVE_STATE_PERIOD_SEC: u64 = 60;
+const SAVE_STATE_PERIOD: u64 = SAVE_STATE_PERIOD_SEC * 1000;
 
 /// Convenience macro to panic with error messages.
 macro_rules! fatal_panic {
@@ -74,20 +76,20 @@ fn make_data_dir(data_dir: &Path) {
     }
 }
 
+fn default_data_dir() -> PathBuf {
+    let data_dir = ProjectDirs::from("ca", "dpbriggs", "redis-oxide").expect("to fetch a default");
+    let mut p = PathBuf::new();
+    p.push(data_dir.data_dir());
+    p
+}
+
 /// Get the dump file
 ///
 /// Panics if a data directory cannot be found, or file cannot be opened.
 pub fn get_dump_file(config: &Config) -> DumpFile {
     let data_dir: PathBuf = match &config.data_dir {
         Some(dir) => dir.to_path_buf(),
-        None => match ProjectDirs::from("ca", "dpbriggs", "redis-oxide") {
-            Some(dir2) => {
-                let mut p = PathBuf::new();
-                p.push(dir2.data_dir());
-                p
-            }
-            None => fatal_panic!("Could not get a data_dir!"),
-        },
+        None => default_data_dir(),
     };
     if !data_dir.exists() {
         make_data_dir(&data_dir);
@@ -111,7 +113,7 @@ pub fn get_dump_file(config: &Config) -> DumpFile {
 pub fn save_state(state: StateRef, dump_file: DumpFile) {
     info!(
         LOGGER,
-        "Saving state (60s or {} ops ran)...", state.commands_threshold
+        "Saving state ({}s or >={} ops ran)...", SAVE_STATE_PERIOD_SEC, state.commands_threshold
     );
     match dump_file.try_lock() {
         Some(mut file) => {
@@ -133,6 +135,10 @@ pub async fn save_state_interval(state: StateRef, dump_file: DumpFile) {
     let mut interval = Interval::new_interval(Duration::from_millis(SAVE_STATE_PERIOD));
     loop {
         interval.next().await;
-        save_state(state.clone(), dump_file.clone());
+        let commands_ran_since_save = state.commands_ran_since_save.load(Ordering::SeqCst);
+        if commands_ran_since_save != 0 {
+            state.commands_ran_since_save.store(0, Ordering::SeqCst);
+            save_state(state.clone(), dump_file.clone());
+        }
     }
 }

@@ -128,7 +128,7 @@ pub struct State {
     #[serde(default)]
     pub blooms: RwLock<KeyBloom>,
     #[serde(skip)]
-    pub commands_ran: AtomicU64,
+    pub commands_ran_since_save: AtomicU64,
     #[serde(skip)]
     pub commands_threshold: u64,
     #[serde(skip)]

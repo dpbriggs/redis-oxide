@@ -4,10 +4,13 @@ use crate::logger::LOGGER;
 use std::path::PathBuf;
 
 #[derive(Debug, StructOpt)]
-#[structopt(name = "redis-oxide", about = "The Rusty Redis Clone")]
+#[structopt(
+    name = "redis-oxide",
+    about = "A multi-threaded implementation of redis written in rust 🦀"
+)]
 #[structopt(raw(setting = "structopt::clap::AppSettings::ColoredHelp"))]
 pub struct Config {
-    /// Database Dump File Directory Location (default: ~/.local/share)
+    /// Database Dump File Directory Location
     #[structopt(short = "d", long = "dump-file", parse(from_os_str))]
     pub data_dir: Option<PathBuf>,
     /// Don't show the starting graphic

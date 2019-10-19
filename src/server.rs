@@ -14,9 +14,9 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::*;
 use tokio_codec::Decoder;
 
-fn save_if_required(state: StateRef, dump_file: DumpFile) {
-    state.commands_ran.fetch_add(1, Ordering::SeqCst);
-    let should_save = state.commands_ran.compare_exchange(
+fn incr_and_save_if_required(state: StateRef, dump_file: DumpFile) {
+    state.commands_ran_since_save.fetch_add(1, Ordering::SeqCst);
+    let should_save = state.commands_ran_since_save.compare_exchange(
         state.commands_threshold,
         0,
         Ordering::SeqCst,
@@ -49,8 +49,8 @@ async fn process(socket: TcpStream, state: StateRef, dump_file: DumpFile) {
                     debug!(LOGGER, "running op {:?}", op.clone());
                     // Step 1: Execute the operation the operation (from translate above)
                     let res: ReturnValue = op_interact(op, state.clone()).await;
-                    // Step 2: Update commands_ran counter, and save if necessary
-                    save_if_required(state.clone(), dump_file.clone());
+                    // Step 2: Update commands_ran_since_save counter, and save if necessary
+                    incr_and_save_if_required(state.clone(), dump_file.clone());
                     // Step 3: Finally Return
                     res.into()
                 }
