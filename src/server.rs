@@ -5,7 +5,7 @@ use crate::logger::LOGGER;
 use crate::{
     ops::translate,
     startup::Config,
-    types::{DumpFile, InteractionRes, RedisValue, StateRef},
+    types::{DumpFile, RedisValue, StateRef, ReturnValue},
 };
 use std::net::SocketAddr;
 use std::sync::atomic::Ordering;
@@ -49,25 +49,12 @@ async fn process(socket: TcpStream, state: StateRef, dump_file: DumpFile) {
                 Ok(op) => {
                     debug!(LOGGER, "running op {:?}", op.clone());
                     // Step 1: Execute the operation the operation (from translate above)
-                    let res = match op_interact(op, state.clone()).await {
-                        InteractionRes::Immediate(r) => RedisValue::from(r),
-                        InteractionRes::ImmediateWithWork(r, w) => {
-                            tokio::spawn(w);
-                            RedisValue::from(r)
-                        }
-                        InteractionRes::Blocking(w) => {
-                            if let InteractionRes::Immediate(r) = w.await.into() {
-                                RedisValue::from(r)
-                            } else {
-                                unreachable!();
-                            }
-                        }
-                    };
+                    let res: ReturnValue = op_interact(op, state.clone()).await;
                     // Step 2: Update commands_ran counter, and save if necessary
                     // Atomics for saving state. Add 1, and then compare with state.commands_threshold.
                     save_if_required(state.clone(), dump_file.clone());
                     // Step 3: Finally Return
-                    res
+                    res.into()
                 }
                 Err(e) => RedisValue::from(e),
             };

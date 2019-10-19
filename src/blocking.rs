@@ -1,5 +1,5 @@
 use crate::data_structures::receipt_map::{KeyTypes, Receipt};
-use crate::types::{InteractionRes, Key, ReturnValue, StateRef};
+use crate::types::{Key, ReturnValue, StateRef};
 
 use std::collections::HashMap;
 use std::future::Future;
@@ -29,19 +29,6 @@ impl KeyBlocking {
             key,
             receipt,
         }
-    }
-    pub fn interaction_res(
-        f: YieldingFn,
-        state: StateRef,
-        key: Key,
-        receipt: Receipt,
-    ) -> InteractionRes {
-        InteractionRes::Blocking(Box::new(KeyBlocking {
-            f,
-            state,
-            key,
-            receipt,
-        }))
     }
 }
 

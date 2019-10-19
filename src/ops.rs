@@ -8,7 +8,7 @@ use crate::lists::{ListOps, list_interact};
 use crate::misc::{MiscOps, misc_interact};
 use crate::sets::{SetOps, set_interact};
 use crate::sorted_sets::{ZSetOps, zset_interact};
-use crate::types::{InteractionRes, StateRef, };
+use crate::types::{ReturnValue, StateRef, };
 
 use crate::types::{
     Count, Index, Key, RedisValue, Score, UTimeout, Value, EMPTY_ARRAY, NULL_ARRAY, NULL_BULK_STRING,
@@ -25,7 +25,7 @@ pub enum Ops {
     Blooms(BloomOps),
 }
 
-pub async fn op_interact(op: Ops, state: StateRef) -> InteractionRes {
+pub async fn op_interact(op: Ops, state: StateRef) -> ReturnValue {
     match op {
         Ops::Keys(op) => key_interact(op, state).await,
         Ops::Sets(op) => set_interact(op, state).await,
@@ -468,9 +468,10 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
             ok!(ListOps::BLPop(key, timeout))
         }
         "brpop" => {
-            verify_size(&tail, 1)?;
+            verify_size(&tail, 2)?;
             let key = Key::try_from(tail[0])?;
-            ok!(ListOps::BRPop(key))
+            let timeout = UTimeout::try_from(tail[1])?;
+            ok!(ListOps::BRPop(key, timeout))
         }
         "rpop" => {
             verify_size(&tail, 1)?;

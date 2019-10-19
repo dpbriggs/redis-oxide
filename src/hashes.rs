@@ -1,4 +1,4 @@
-use crate::types::{Count, InteractionRes, Key, ReturnValue, StateRef, Value};
+use crate::types::{Count, ReturnValue, Key, StateRef, Value};
 use crate::{make_reader, make_writer};
 use std::collections::hash_map::Entry;
 
@@ -22,13 +22,13 @@ pub enum HashOps {
 
 macro_rules! ops_error {
     ($state:expr) => {
-        InteractionRes::Immediate(ReturnValue::Error($state))
+        ReturnValue::Error($state)
     };
 }
 
 make_reader!(hashes, read_hashes);
 make_writer!(hashes, write_hashes);
-pub async fn hash_interact(hash_op: HashOps, state: StateRef) -> InteractionRes {
+pub async fn hash_interact(hash_op: HashOps, state: StateRef) -> ReturnValue {
     match hash_op {
         HashOps::HGet(key, field) => read_hashes!(state)
             .get(&key)
@@ -49,7 +49,7 @@ pub async fn hash_interact(hash_op: HashOps, state: StateRef) -> InteractionRes 
         HashOps::HGetAll(key) => {
             read_hashes!(state, &key, hash);
             if hash.is_none() {
-                return ReturnValue::MultiStringRes(vec![]).into();
+                return ReturnValue::MultiStringRes(vec![]);
             }
             let mut ret = Vec::new();
             for (key, val) in hash.unwrap().iter() {
@@ -101,10 +101,18 @@ pub async fn hash_interact(hash_op: HashOps, state: StateRef) -> InteractionRes 
             hashes.insert(field, curr_value.to_string().as_bytes().to_vec());
             ReturnValue::Ok
         }
-        HashOps::HLen(key) => match read_hashes!(state, &key) {
-            Some(hash) => ReturnValue::IntRes(hash.len() as Count),
-            None => ReturnValue::IntRes(0),
-        },
+        HashOps::HLen(key) => read_hashes!(state, &key)
+            .map_or(0, |hash| hash.len() as Count)
+            .into(),
+
+        // HashOps::HLen(key) => read_hashes!(state, &key)
+        //     .map(|hash| hash.len() as Count)
+        //     .unwrap_or(0)
+        //     .into(),
+        // HashOps::HLen(key) => match read_hashes!(state, &key) {
+        //     Some(hash) => ReturnValue::IntRes(hash.len() as Count),
+        //     None => ReturnValue::IntRes(0),
+        // },
         HashOps::HDel(key, fields) => match write_hashes!(state, &key) {
             Some(hash) => {
                 let res = fields.iter().filter_map(|field| hash.remove(field)).count();
@@ -135,5 +143,4 @@ pub async fn hash_interact(hash_op: HashOps, state: StateRef) -> InteractionRes 
             }
         }
     }
-    .into()
 }

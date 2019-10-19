@@ -1,6 +1,4 @@
-use crate::types::{
-    Count, Index, InteractionRes, Key, ReturnValue, Score, StateRef,
-};
+use crate::types::{Count, Index, Key, ReturnValue, Score, StateRef};
 use crate::{make_reader, make_writer};
 
 /// ZSet Ops
@@ -26,13 +24,13 @@ fn deal_with_negative_indices(coll_size: Count, bounds: (Index, Index)) -> (Inde
     (start, end)
 }
 
-pub async fn zset_interact(zset_op: ZSetOps, state: StateRef) -> InteractionRes {
+pub async fn zset_interact(zset_op: ZSetOps, state: StateRef) -> ReturnValue {
     match zset_op {
         ZSetOps::ZAdd(zset_key, member_scores) => {
             state.create_zset_if_necessary(&zset_key);
             write_zsets!(state, &zset_key, zset);
             let num_added = zset.add(member_scores);
-            ReturnValue::IntRes(num_added).into()
+            ReturnValue::IntRes(num_added)
         }
         ZSetOps::ZRem(zset_key, keys) => write_zsets!(state, &zset_key)
             .map(|zset| zset.remove(&keys))
@@ -56,8 +54,7 @@ pub async fn zset_interact(zset_op: ZSetOps, state: StateRef) -> InteractionRes 
         ZSetOps::ZScore(zset_key, member_key) => read_zsets!(state, &zset_key)
             .and_then(|zset| zset.score(member_key))
             .map(ReturnValue::IntRes)
-            .unwrap_or(ReturnValue::Nil)
-            .into(),
+            .unwrap_or(ReturnValue::Nil),
         ZSetOps::ZPopMax(zset_key, count) => write_zsets!(state, &zset_key)
             .map(|zset| {
                 zset.pop_max(Some(count))
@@ -69,8 +66,7 @@ pub async fn zset_interact(zset_op: ZSetOps, state: StateRef) -> InteractionRes 
                     })
             })
             .map(ReturnValue::Array)
-            .unwrap_or_else(|| ReturnValue::Array(vec![]))
-            .into(),
+            .unwrap_or_else(|| ReturnValue::Array(vec![])),
         ZSetOps::ZPopMin(zset_key, count) => write_zsets!(state, &zset_key)
             .map(|zset| {
                 zset.pop_min(Some(count))
@@ -82,13 +78,11 @@ pub async fn zset_interact(zset_op: ZSetOps, state: StateRef) -> InteractionRes 
                     })
             })
             .map(ReturnValue::Array)
-            .unwrap_or_else(|| ReturnValue::Array(vec![]))
-            .into(),
+            .unwrap_or_else(|| ReturnValue::Array(vec![])),
         ZSetOps::ZRank(zset_key, mem_key) => read_zsets!(state, &zset_key)
             .and_then(|zset| zset.rank(mem_key))
             .map(ReturnValue::IntRes)
-            .unwrap_or(ReturnValue::Nil)
-            .into(),
+            .unwrap_or(ReturnValue::Nil),
     }
 }
 
@@ -99,12 +93,12 @@ pub async fn zset_interact(zset_op: ZSetOps, state: StateRef) -> InteractionRes 
 //                 state.create_zset_if_necessary(&zset_key);
 //                 write_zsets!(state, &zset_key, zset);
 //                 let num_added = zset.add(member_scores);
-//                 ReturnValue::IntRes(num_added).into()
+//                 ReturnValue::IntRes(num_added)
 //             }
 //             ZSetOps::ZRem(zset_key, keys) => write_zsets!(state, &zset_key)
 //                 .map(|zset| zset.remove(&keys))
 //                 .unwrap_or(0)
-//                 .into(),
+//                 ,
 //             ZSetOps::ZRange(zset_key, start, stop) => read_zsets!(state, &zset_key)
 //                 .map(|zset| {
 //                     let (start, stop) = deal_with_negative_indices(zset.card(), (start, stop));
@@ -115,16 +109,16 @@ pub async fn zset_interact(zset_op: ZSetOps, state: StateRef) -> InteractionRes 
 //                         .collect()
 //                 })
 //                 .unwrap_or_else(Vec::new)
-//                 .into(),
+//                 ,
 //             ZSetOps::ZCard(zset_key) => read_zsets!(state, &zset_key)
 //                 .map(|zset| zset.card())
 //                 .unwrap_or(0)
-//                 .into(),
+//                 ,
 //             ZSetOps::ZScore(zset_key, member_key) => read_zsets!(state, &zset_key)
 //                 .and_then(|zset| zset.score(member_key))
 //                 .map(ReturnValue::IntRes)
 //                 .unwrap_or(ReturnValue::Nil)
-//                 .into(),
+//                 ,
 //             ZSetOps::ZPopMax(zset_key, count) => write_zsets!(state, &zset_key)
 //                 .map(|zset| {
 //                     zset.pop_max(Some(count))
@@ -137,7 +131,7 @@ pub async fn zset_interact(zset_op: ZSetOps, state: StateRef) -> InteractionRes 
 //                 })
 //                 .map(ReturnValue::Array)
 //                 .unwrap_or_else(|| ReturnValue::Array(vec![]))
-//                 .into(),
+//                 ,
 //             ZSetOps::ZPopMin(zset_key, count) => write_zsets!(state, &zset_key)
 //                 .map(|zset| {
 //                     zset.pop_min(Some(count))
@@ -150,12 +144,12 @@ pub async fn zset_interact(zset_op: ZSetOps, state: StateRef) -> InteractionRes 
 //                 })
 //                 .map(ReturnValue::Array)
 //                 .unwrap_or_else(|| ReturnValue::Array(vec![]))
-//                 .into(),
+//                 ,
 //             ZSetOps::ZRank(zset_key, mem_key) => read_zsets!(state, &zset_key)
 //                 .and_then(|zset| zset.rank(mem_key))
 //                 .map(ReturnValue::IntRes)
 //                 .unwrap_or(ReturnValue::Nil)
-//                 .into(),
+//                 ,
 //         }
 //     }
 // }

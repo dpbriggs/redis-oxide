@@ -5,7 +5,6 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::convert::From;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
-use tokio::prelude::*;
 
 use parking_lot::Mutex;
 use std::fs::File;
@@ -25,6 +24,8 @@ pub type Index = i64;
 pub type Score = i64;
 /// Timeout unit
 pub type UTimeout = i64;
+/// Bool type
+pub type RedisBool = i64;
 
 /// DumpTimeoutUnitpe alias.
 pub type DumpFile = Arc<Mutex<File>>;
@@ -63,50 +64,19 @@ pub enum ReturnValue {
     // FutureResValue(Box<Future<Item = (), Error = ()> + Send>),
 }
 
-/// Convenience trait to convert ReturnValues to InteractionRes.
-impl From<ReturnValue> for InteractionRes {
-    fn from(int: ReturnValue) -> InteractionRes {
-        InteractionRes::Immediate(int)
+/// Convenience trait to convert Count to ReturnValue.
+impl From<Count> for ReturnValue {
+    fn from(int: Count) -> ReturnValue {
+        ReturnValue::IntRes(int)
     }
 }
 
-/// Convenience trait to convert ReturnValues to InteractionRes.
-impl From<Count> for InteractionRes {
-    fn from(int: Count) -> InteractionRes {
-        ReturnValue::IntRes(int).into()
-    }
-}
-
-/// Convenience trait to convert ReturnValues to InteractionRes.
-impl From<Vec<String>> for InteractionRes {
-    fn from(strings: Vec<String>) -> InteractionRes {
+/// Convenience trait to convert ReturnValues to ReturnValue.
+impl From<Vec<String>> for ReturnValue {
+    fn from(strings: Vec<String>) -> ReturnValue {
         let strings_to_bytes: Vec<Vec<u8>> =
             strings.into_iter().map(|s| s.as_bytes().to_vec()).collect();
-        ReturnValue::MultiStringRes(strings_to_bytes).into()
-    }
-}
-
-/// Highest level output type. This is the return value returned by operations.
-pub enum InteractionRes {
-    Immediate(ReturnValue),
-    #[allow(dead_code)]
-    ImmediateWithWork(
-        ReturnValue,
-        Box<dyn Future<Output = ()> + Send + std::marker::Unpin>,
-    ),
-    Blocking(Box<dyn Future<Output = ReturnValue> + Send + std::marker::Unpin>),
-}
-
-/// Debug impl for InteractionRes; used by debug logs.
-impl std::fmt::Debug for InteractionRes {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            InteractionRes::Immediate(v) => write!(f, "{:?}", v),
-            InteractionRes::ImmediateWithWork(v, _) => {
-                write!(f, "ImmediateWithWork({:?}, Box<Future>)", v)
-            }
-            InteractionRes::Blocking(_) => write!(f, "foobar"),
-        }
+        ReturnValue::MultiStringRes(strings_to_bytes)
     }
 }
 

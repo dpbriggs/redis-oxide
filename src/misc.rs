@@ -1,4 +1,4 @@
-use crate::types::{Count, InteractionRes, Key, ReturnValue, StateRef};
+use crate::types::{Count, Key, ReturnValue, StateRef};
 
 #[derive(Debug, Clone)]
 pub enum MiscOps {
@@ -7,7 +7,8 @@ pub enum MiscOps {
     Pong,
     FlushAll,
 }
-pub async fn misc_interact(misc_op: MiscOps, state: StateRef) -> InteractionRes {
+
+pub async fn misc_interact(misc_op: MiscOps, state: StateRef) -> ReturnValue {
     match misc_op {
         MiscOps::Pong => ReturnValue::StringRes(b"PONG".to_vec()),
         MiscOps::FlushAll => {
@@ -33,7 +34,7 @@ pub async fn misc_interact(misc_op: MiscOps, state: StateRef) -> InteractionRes 
             kv_keys.append(&mut list_keys);
             ReturnValue::MultiStringRes(kv_keys)
         }
-    }.into()
+    }
 }
 // impl StateInteration for MiscOps {
 //     fn interact(self, state: StateRef) -> InteractionRes {

@@ -1,4 +1,4 @@
-use crate::types::{Count, InteractionRes, Key, ReturnValue, StateRef, Value};
+use crate::types::{Count, Key, ReturnValue, StateRef, Value};
 use std::collections::HashSet;
 
 #[derive(Debug, Clone)]
@@ -50,7 +50,7 @@ fn many_set_op(state: &StateRef, keys: Vec<Key>, op: SetAction) -> Option<HashSe
     Some(head)
 }
 
-pub async fn set_interact(set_op: SetOps, state: StateRef) -> InteractionRes {
+pub async fn set_interact(set_op: SetOps, state: StateRef) -> ReturnValue {
     match set_op {
         SetOps::SAdd(set_key, vals) => {
             state.create_set_if_necessary(&set_key);
@@ -124,16 +124,16 @@ pub async fn set_interact(set_op: SetOps, state: StateRef) -> InteractionRes {
             let mut sets = write_sets!(state);
             let set = match sets.get_mut(&key) {
                 Some(s) => s,
-                None => return ReturnValue::Nil.into(),
+                None => return ReturnValue::Nil,
             };
             if set.is_empty() && count.is_some() {
-                return ReturnValue::MultiStringRes(vec![]).into();
+                return ReturnValue::MultiStringRes(vec![]);
             } else if set.is_empty() {
-                return ReturnValue::Nil.into();
+                return ReturnValue::Nil;
             }
             let count = count.unwrap_or(1);
             if count < 0 {
-                return ReturnValue::Error(b"Count cannot be less than 0!").into();
+                return ReturnValue::Error(b"Count cannot be less than 0!");
             }
             let eles: Vec<Value> = set.iter().take(count as usize).cloned().collect();
             for ele in eles.iter() {
@@ -151,7 +151,7 @@ pub async fn set_interact(set_op: SetOps, state: StateRef) -> InteractionRes {
         SetOps::SMove(src, dest, member) => {
             let sets = read_sets!(state);
             if !sets.contains_key(&src) || !sets.contains_key(&dest) {
-                return ReturnValue::IntRes(0).into();
+                return ReturnValue::IntRes(0);
             }
 
             let mut sets = write_sets!(state);
@@ -170,14 +170,13 @@ pub async fn set_interact(set_op: SetOps, state: StateRef) -> InteractionRes {
                 if count < 0 {
                     return ReturnValue::MultiStringRes(
                         set.iter().cycle().take(-count as usize).cloned().collect(),
-                    )
-                    .into();
+                    );
                 };
                 ReturnValue::MultiStringRes(set.iter().take(count as usize).cloned().collect())
             }
             None => ReturnValue::Nil,
         },
-    }.into()
+    }
 }
 // impl StateInteration for SetOps {
 //     fn interact(self, state: StateRef) -> InteractionRes {
@@ -260,16 +259,16 @@ pub async fn set_interact(set_op: SetOps, state: StateRef) -> InteractionRes {
 //                 let mut sets = write_sets!(state);
 //                 let set = match sets.get_mut(&key) {
 //                     Some(s) => s,
-//                     None => return ReturnValue::Nil.into(),
+//                     None => return ReturnValue::Nil,
 //                 };
 //                 if set.is_empty() && count.is_some() {
-//                     return ReturnValue::MultiStringRes(vec![]).into();
+//                     return ReturnValue::MultiStringRes(vec![]);
 //                 } else if set.is_empty() {
-//                     return ReturnValue::Nil.into();
+//                     return ReturnValue::Nil;
 //                 }
 //                 let count = count.unwrap_or(1);
 //                 if count < 0 {
-//                     return ReturnValue::Error(b"Count cannot be less than 0!").into();
+//                     return ReturnValue::Error(b"Count cannot be less than 0!");
 //                 }
 //                 let eles: Vec<Value> = set.iter().take(count as usize).cloned().collect();
 //                 for ele in eles.iter() {
@@ -287,7 +286,7 @@ pub async fn set_interact(set_op: SetOps, state: StateRef) -> InteractionRes {
 //             SetOps::SMove(src, dest, member) => {
 //                 let sets = read_sets!(state);
 //                 if !sets.contains_key(&src) || !sets.contains_key(&dest) {
-//                     return ReturnValue::IntRes(0).into();
+//                     return ReturnValue::IntRes(0);
 //                 }
 
 //                 let mut sets = write_sets!(state);
@@ -307,13 +306,13 @@ pub async fn set_interact(set_op: SetOps, state: StateRef) -> InteractionRes {
 //                         return ReturnValue::MultiStringRes(
 //                             set.iter().cycle().take(-count as usize).cloned().collect(),
 //                         )
-//                         .into();
+//                         ;
 //                     };
 //                     ReturnValue::MultiStringRes(set.iter().take(count as usize).cloned().collect())
 //                 }
 //                 None => ReturnValue::Nil,
 //             },
 //         }
-//         .into()
+//
 //     }
 // }
