@@ -23,8 +23,8 @@ fn save_if_required(state: StateRef, dump_file: DumpFile) {
         Ordering::SeqCst,
     );
     if should_save.is_ok() {
-        let state_clone = state.clone();
-        let dump_file_clone = dump_file.clone();
+        let state_clone = state;
+        let dump_file_clone = dump_file;
         tokio::spawn(async {
             save_state(state_clone, dump_file_clone);
         });
@@ -50,7 +50,6 @@ async fn process(socket: TcpStream, state: StateRef, dump_file: DumpFile) {
                     // Step 1: Execute the operation the operation (from translate above)
                     let res: ReturnValue = op_interact(op, state.clone()).await;
                     // Step 2: Update commands_ran counter, and save if necessary
-                    // Atomics for saving state. Add 1, and then compare with state.commands_threshold.
                     save_if_required(state.clone(), dump_file.clone());
                     // Step 3: Finally Return
                     res.into()

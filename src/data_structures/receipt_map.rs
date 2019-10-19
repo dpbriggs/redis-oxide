@@ -57,7 +57,6 @@ impl RecieptMap {
     }
 
     pub fn timeout_receipt(&mut self, receipt: Receipt) {
-        println!("{:?}", &self);
         self.timed_out.insert(receipt);
         if let Some(waker) = self.wakers.remove(&receipt) {
             waker.wake();

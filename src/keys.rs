@@ -1,3 +1,4 @@
+use crate::logger::LOGGER;
 use crate::types::{Count, Key, ReturnValue, StateRef, Value};
 
 #[derive(Debug, Clone)]
@@ -32,7 +33,7 @@ pub async fn key_interact(key_op: KeyOps, state: StateRef) -> ReturnValue {
             ReturnValue::Array(vals)
         }
         KeyOps::Set(key, value) => {
-            state.kv.write().insert(key.clone(), value);
+            state.kv.write().insert(key, value);
             ReturnValue::Ok
         }
         KeyOps::MSet(key_vals) => {
@@ -74,7 +75,18 @@ pub async fn key_interact(key_op: KeyOps, state: StateRef) -> ReturnValue {
             }
         }
         KeyOps::Test(key) => {
-            println!("{}", String::from_utf8_lossy(&key));
+            let value = state
+                .kv
+                .read()
+                .get(&key)
+                .cloned()
+                .unwrap_or_else(|| b"hi".to_vec());
+            info!(
+                LOGGER,
+                "{} = {}",
+                String::from_utf8_lossy(&key),
+                String::from_utf8_lossy(&value)
+            );
             ReturnValue::Ok
         }
     }
