@@ -123,10 +123,9 @@ The general design of =redis-oxide= is:
 
 - A Command (=set foo bar=) is read off the socket and passed to the translate function in =src/ops.rs=.
   - The parser generates a =RedisValue=, which is the lingua franca of =redis-oxide=.
-- This gets converted to an =Ops::XYZ(XYZOps::Foobar(..))= enum object, which implements the =StateInteration= trait.
-  - This nested enum is a dirty way to get static dispatch and hacky-polymorphism. If you can find a nice generic way to represent this, please let me know!
-  - A macro eases the pain of this.
-- This operation is executed against the global =State= object (using the =StateInteraction= trait).
+- This gets converted to an =Ops::XYZ(XYZOps::Foobar(..))= enum object, which is consumed by the =op_interact= function. 
+  - A macro is used to provide automate this.
+- This operation is executed against the global =State= object (using the =op_interact= function)
   - This will return an =ReturnValue= type, which is a more convenient form of =RedisValue=.
   - This =ReturnValue= is converted and sent back to the client.
 
@@ -139,9 +138,10 @@ Therefore, if you want to do something like implement =hashes=, you will need to
 3. Create an enum to track your commands, =pub enum HashOps { HSet(Key, Key, Value) }=
 4. Implement parsing for your enum in =src/ops.rs=.
    1. You should be able to follow the existing parsing infrastructure. Should just be extra entries in =translate_array= in =src/ops.rs=.
-   2. You should return something like =Ok(Ops::Hash(HashOps::HSet(x, y, z)))=.
-   3. A stretch goal is to automate parsing.
-5. Implement =StateInteration= for your type; I would follow existing implementations (eg. =src/keys.rs=).
+   2. You will need to add your return type to the =ok!= macro. Just copy/paste an existing line.
+   3. You should return something like =ok!(HashOps::HSet(x, y, z))=.
+   4. A stretch goal is to automate parsing.
+5. Implement a =async *_interact= for your type; I would follow existing implementations (eg. =src/keys.rs=).
    1. I would keep the redis docs open, and play around with the commands in the web console (or wherever) to determine behavior.
-   2. Add a new match entry in the =State::interact= method in =src/state.rs=.
+   2. Add a new match entry in the =async op_interact= function in =src/ops.rs=.
 6. Test it! (follow existing testing bits; eg. =src/keys.rs=).

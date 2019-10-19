@@ -29,8 +29,8 @@ make_writer!(lists, write_lists);
 pub async fn list_interact(list_op: ListOps, state: StateRef) -> ReturnValue {
     match list_op {
         ListOps::LPush(key, vals) => {
-            state.create_list_if_necessary(&key);
-            write_lists!(state, &key, list);
+            let mut list_lock = state.lists.write();
+            let list = list_lock.entry(key.clone()).or_default();
             for val in vals {
                 list.push_front(val);
             }
@@ -38,14 +38,26 @@ pub async fn list_interact(list_op: ListOps, state: StateRef) -> ReturnValue {
             ReturnValue::IntRes(list.len() as Count)
         }
         ListOps::LPushX(key, val) => {
-            if !read_lists!(state).contains_key(&key) {
-                return ReturnValue::IntRes(0);
+            let mut list_lock = state.lists.write();
+            match list_lock.get_mut(&key) {
+                Some(list) => {
+                    list.push_front(val);
+                    state.wake_list(&key);
+                    ReturnValue::IntRes(list.len() as Count)
+                }
+                None => ReturnValue::IntRes(0),
             }
-            state.create_list_if_necessary(&key);
-            write_lists!(state, &key, list);
-            list.push_front(val);
-            state.wake_list(&key);
-            ReturnValue::IntRes(list.len() as Count)
+        }
+        ListOps::RPushX(key, val) => {
+            let mut list_lock = state.lists.write();
+            match list_lock.get_mut(&key) {
+                Some(list) => {
+                    list.push_back(val);
+                    state.wake_list(&key);
+                    ReturnValue::IntRes(list.len() as Count)
+                }
+                None => ReturnValue::IntRes(0),
+            }
         }
         ListOps::LLen(key) => match read_lists!(state, &key) {
             Some(l) => ReturnValue::IntRes(l.len() as Count),
@@ -60,21 +72,11 @@ pub async fn list_interact(list_op: ListOps, state: StateRef) -> ReturnValue {
             None => ReturnValue::Nil,
         },
         ListOps::RPush(key, vals) => {
-            state.create_list_if_necessary(&key);
-            write_lists!(state, &key, list);
+            let mut list_lock = state.lists.write();
+            let list = list_lock.entry(key).or_default();
             for val in vals {
                 list.push_back(val)
             }
-            ReturnValue::IntRes(list.len() as Count)
-        }
-        ListOps::RPushX(key, val) => {
-            if !read_lists!(state).contains_key(&key) {
-                return ReturnValue::IntRes(0);
-            }
-            state.create_list_if_necessary(&key);
-            write_lists!(state, &key, list);
-            list.push_back(val);
-            state.wake_list(&key);
             ReturnValue::IntRes(list.len() as Count)
         }
         ListOps::LIndex(key, index) => match write_lists!(state, &key) {
@@ -152,9 +154,6 @@ pub async fn list_interact(list_op: ListOps, state: StateRef) -> ReturnValue {
             }
         }
         ListOps::RPopLPush(source, dest) => {
-            if source != dest {
-                state.create_list_if_necessary(&dest);
-            }
             let mut lists = write_lists!(state);
             match lists.get_mut(&source) {
                 None => ReturnValue::Nil,
@@ -164,7 +163,10 @@ pub async fn list_interact(list_op: ListOps, state: StateRef) -> ReturnValue {
                         if source == dest {
                             source_list.push_back(value.clone());
                         } else {
-                            lists.get_mut(&dest).unwrap().push_back(value.clone());
+                            lists
+                                .entry(dest.clone())
+                                .or_default()
+                                .push_back(value.clone());
                             state.wake_list(&dest);
                         }
                         ReturnValue::StringRes(value)

@@ -35,9 +35,8 @@ pub async fn hash_interact(hash_op: HashOps, state: StateRef) -> ReturnValue {
             .and_then(|hashes| hashes.get(&field))
             .map_or(ReturnValue::Nil, |v| ReturnValue::StringRes(v.clone())),
         HashOps::HSet(key, field, value) => {
-            state.create_hashes_if_necessary(&key);
-            write_hashes!(state, &key, hash);
-            hash.insert(field, value);
+            let mut hash_lock = state.hashes.write();
+            hash_lock.entry(key).or_default().insert(field, value);
             ReturnValue::Ok
         }
         HashOps::HExists(key, field) => read_hashes!(state)
@@ -77,15 +76,14 @@ pub async fn hash_interact(hash_op: HashOps, state: StateRef) -> ReturnValue {
             None => ReturnValue::Array(vec![]),
         },
         HashOps::HMSet(key, key_values) => {
-            state.create_hashes_if_necessary(&key);
-            write_hashes!(state, &key, hash);
-            hash.extend(key_values);
+            let mut hash_lock = state.hashes.write();
+            hash_lock.entry(key).or_default().extend(key_values);
             ReturnValue::Ok
         }
         HashOps::HIncrBy(key, field, count) => {
-            state.create_hashes_if_necessary(&key);
-            write_hashes!(state, &key, hashes);
-            let mut curr_value = match hashes.get(&field) {
+            let mut hash_lock = state.hashes.write();
+            let hash = hash_lock.entry(key).or_default();
+            let mut curr_value = match hash.get(&field) {
                 Some(value) => {
                     let i64_repr = std::str::from_utf8(value)
                         .map(|e| e.parse::<i64>())
@@ -98,7 +96,7 @@ pub async fn hash_interact(hash_op: HashOps, state: StateRef) -> ReturnValue {
                 None => 0,
             };
             curr_value += count;
-            hashes.insert(field, curr_value.to_string().as_bytes().to_vec());
+            hash.insert(field, curr_value.to_string().as_bytes().to_vec());
             ReturnValue::Ok
         }
         HashOps::HLen(key) => read_hashes!(state, &key)
@@ -133,9 +131,8 @@ pub async fn hash_interact(hash_op: HashOps, state: StateRef) -> ReturnValue {
                 ReturnValue::IntRes(v.len() as Count)
             }),
         HashOps::HSetNX(key, field, value) => {
-            state.create_hashes_if_necessary(&key);
-            write_hashes!(state, &key, hash);
-            if let Entry::Vacant(ent) = hash.entry(field) {
+            let mut hash_lock = state.hashes.write();
+            if let Entry::Vacant(ent) = hash_lock.entry(key).or_default().entry(field) {
                 ent.insert(value);
                 ReturnValue::IntRes(1)
             } else {

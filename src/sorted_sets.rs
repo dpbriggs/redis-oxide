@@ -27,8 +27,8 @@ fn deal_with_negative_indices(coll_size: Count, bounds: (Index, Index)) -> (Inde
 pub async fn zset_interact(zset_op: ZSetOps, state: StateRef) -> ReturnValue {
     match zset_op {
         ZSetOps::ZAdd(zset_key, member_scores) => {
-            state.create_zset_if_necessary(&zset_key);
-            write_zsets!(state, &zset_key, zset);
+            let mut zset_lock = state.zsets.write();
+            let zset = zset_lock.entry(zset_key).or_default();
             let num_added = zset.add(member_scores);
             ReturnValue::IntRes(num_added)
         }

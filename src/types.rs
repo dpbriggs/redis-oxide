@@ -72,6 +72,13 @@ impl From<Count> for ReturnValue {
 }
 
 /// Convenience trait to convert ReturnValues to ReturnValue.
+impl From<Vec<Value>> for ReturnValue {
+    fn from(vals: Vec<Value>) -> ReturnValue {
+        ReturnValue::Array(vals.into_iter().map(ReturnValue::StringRes).collect())
+    }
+}
+
+/// Convenience trait to convert ReturnValues to ReturnValue.
 impl From<Vec<String>> for ReturnValue {
     fn from(strings: Vec<String>) -> ReturnValue {
         let strings_to_bytes: Vec<Vec<u8>> =

@@ -26,6 +26,8 @@ pub enum Ops {
     Blooms(BloomOps),
 }
 
+/// Top level interaction function. Used by the server to run
+/// operations against state.
 pub async fn op_interact(op: Ops, state: StateRef) -> ReturnValue {
     match op {
         Ops::Keys(op) => key_interact(op, state).await,
@@ -268,9 +270,7 @@ where
     let vals = tail.iter().skip(1).step_by(2);
     let mut ret = Vec::new();
     for (&key, &val) in keys.zip(vals) {
-        dbg!(key);
         let key = KeyType::try_from(key)?;
-        dbg!(val);
         let val = ValueType::try_from(val)?;
         ret.push((key, val))
     }
