@@ -1,6 +1,6 @@
 #![deny(unsafe_code)]
 #![feature(test, async_closure)]
-
+#![warn(clippy::all, clippy::nursery)]
 extern crate test;
 
 #[macro_use]

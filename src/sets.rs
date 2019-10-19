@@ -38,9 +38,9 @@ fn many_set_op(state: &StateRef, keys: Vec<Key>, op: SetAction) -> Option<HashSe
     let mut head: HashSet<Key> = (*sets.first().unwrap()).to_owned();
     for set in sets.iter().skip(1).cloned() {
         head = match op {
-            SetAction::Diff => head.difference(&set).cloned().collect(),
-            SetAction::Union => head.union(&set).cloned().collect(),
-            SetAction::Inter => head.intersection(&set).cloned().collect(),
+            SetAction::Diff => head.difference(set).cloned().collect(),
+            SetAction::Union => head.union(set).cloned().collect(),
+            SetAction::Inter => head.intersection(set).cloned().collect(),
         }
     }
     Some(head)

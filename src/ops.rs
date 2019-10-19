@@ -251,7 +251,7 @@ where
     let set_key = KeyType::try_from(&array[1])?;
     let mut tail: Vec<TailType> = Vec::new();
     for tail_item in array.iter().skip(2) {
-        let tmp = TailType::try_from(&tail_item)?;
+        let tmp = TailType::try_from(tail_item)?;
         tail.push(tmp)
     }
     Ok((set_key, tail))

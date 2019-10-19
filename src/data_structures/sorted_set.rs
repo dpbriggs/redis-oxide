@@ -71,7 +71,7 @@ impl SortedSetMember {
     fn new(key: &[u8], score: Score) -> Self {
         SortedSetMember {
             score,
-            member: String::from_utf8_lossy(&key).to_string(),
+            member: String::from_utf8_lossy(key).to_string(),
         }
     }
 }
@@ -110,7 +110,7 @@ impl SortedSet {
             .map(|key| match self.members_hash.remove(key) {
                 None => 0,
                 Some(score) => {
-                    let tmp = SortedSetMember::new(&key, score);
+                    let tmp = SortedSetMember::new(key, score);
                     self.scores.remove(&tmp);
                     1
                 }
@@ -180,9 +180,9 @@ mod test_sorted_sets_ds {
 
     fn get_multiple_entries() -> Vec<(Score, Key)> {
         vec![
-            (1, "hi_0".as_bytes().to_vec()),
-            (3, "hi_1".as_bytes().to_vec()),
-            (5, "hi_2".as_bytes().to_vec()),
+            (1, b"hi_0".to_vec()),
+            (3, b"hi_1".to_vec()),
+            (5, b"hi_2".to_vec()),
         ]
     }
 
@@ -196,7 +196,7 @@ mod test_sorted_sets_ds {
     #[test]
     fn test_add() {
         let mut ss = SortedSet::new();
-        assert_eq!(1, ss.add(vec![(2, "hi".as_bytes().to_vec())]));
+        assert_eq!(1, ss.add(vec![(2, b"hi".to_vec())]));
         assert_eq!(
             get_multiple_entries().len() as i64,
             ss.add(get_multiple_entries())
@@ -209,21 +209,21 @@ mod test_sorted_sets_ds {
         let mut ss = SortedSet::new();
 
         ss.add(vec![
-            (1, "hi_0".as_bytes().to_vec()),
-            (3, "hi_1".as_bytes().to_vec()),
-            (5, "hi_2".as_bytes().to_vec()),
+            (1, b"hi_0".to_vec()),
+            (3, b"hi_1".to_vec()),
+            (5, b"hi_2".to_vec()),
         ]);
         assert_eq!(
             ss.range((1, 5)),
             vec![
-                SortedSetMember::new(&"hi_0".as_bytes().to_vec(), 1),
-                SortedSetMember::new(&"hi_1".as_bytes().to_vec(), 3),
-                SortedSetMember::new(&"hi_2".as_bytes().to_vec(), 5),
+                SortedSetMember::new(&b"hi_0".to_vec(), 1),
+                SortedSetMember::new(&b"hi_1".to_vec(), 3),
+                SortedSetMember::new(&b"hi_2".to_vec(), 5),
             ]
         );
         assert_eq!(
             ss.range((2, 4)),
-            vec![SortedSetMember::new(&"hi_1".as_bytes().to_vec(), 3),]
+            vec![SortedSetMember::new(&b"hi_1".to_vec(), 3),]
         );
         let empty_vec: Vec<SortedSetMember> = Vec::new();
         assert_eq!(ss.range((20, 40)), empty_vec);
@@ -238,7 +238,7 @@ mod test_sorted_sets_ds {
             .collect();
         assert_eq!(0, ss.remove(&all_keys.clone()));
         ss.add(get_multiple_entries());
-        assert_eq!(1, ss.remove(&vec![all_keys[1].clone()]));
+        assert_eq!(1, ss.remove(&[all_keys[1].clone()]));
         assert_eq!(2, ss.card());
         assert_eq!(2, ss.remove(&all_keys));
         assert_eq!(0, ss.card());
