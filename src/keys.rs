@@ -1,9 +1,9 @@
 use crate::logger::LOGGER;
+use crate::op_variants;
 use crate::types::{Count, Key, ReturnValue, StateRef, Value};
 
-#[derive(Debug, Clone)]
-pub enum KeyOps {
-    // Key Value
+op_variants! {
+    KeyOps,
     Set(Key, Value),
     MSet(Vec<(Key, Value)>),
     Get(Key),
@@ -11,7 +11,7 @@ pub enum KeyOps {
     Del(Vec<Key>),
     Rename(Key, Key),
     RenameNx(Key, Key),
-    Test(Key),
+    Test(Key)
 }
 
 pub async fn key_interact(key_op: KeyOps, state: StateRef) -> ReturnValue {

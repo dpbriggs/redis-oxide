@@ -145,3 +145,107 @@ Therefore, if you want to do something like implement =hashes=, you will need to
    1. I would keep the redis docs open, and play around with the commands in the web console (or wherever) to determine behavior.
    2. Add a new match entry in the =async op_interact= function in =src/ops.rs=.
 6. Test it! (follow existing testing bits; eg. =src/keys.rs=).
+7. Please add the commands to the list below.
+   1. If you're using emacs, just fire up the server and evaluate the babel block below (see =README.org= source)
+
+** Implemented Commands
+
+#+BEGIN_SRC python :results output raw :format org :exports results
+  import redis
+
+  r = redis.StrictRedis(decode_responses=True)
+
+  all_commands = r.execute_command('printcmds')
+
+  for command in all_commands:
+      command_name, ops = command[0], command[1:]
+      print(f'*** {command_name}\n')
+      for op in ops:
+          print(f'- ={op}=')
+      print('\n')
+#+END_SRC
+
+#+RESULTS:
+*** KeyOps
+
+- =Set (Key, Value)=
+- =MSet (Vec<(Key, Value)>)=
+- =Get (Key)=
+- =MGet (Vec<Key>)=
+- =Del (Vec<Key>)=
+- =Rename (Key, Key)=
+- =RenameNx (Key, Key)=
+- =Test (Key)=
+
+
+*** ListOps
+
+- =LIndex (Key, Index)=
+- =LLen (Key)=
+- =LPop (Key)=
+- =LPush (Key, Vec<Value>)=
+- =LPushX (Key, Value)=
+- =LRange (Key, Index, Index)=
+- =LSet (Key, Index, Value)=
+- =LTrim (Key, Index, Index)=
+- =RPop (Key)=
+- =RPush (Key, Vec<Value>)=
+- =RPushX (Key, Value)=
+- =RPopLPush (Key, Key)=
+- =BLPop (Key, UTimeout)=
+- =BRPop (Key, UTimeout)=
+
+
+*** HashOps
+
+- =HGet (Key, Key)=
+- =HSet (Key, Key, Value)=
+- =HExists (Key, Key)=
+- =HGetAll (Key)=
+- =HMGet (Key, Vec<Key>)=
+- =HKeys (Key)=
+- =HMSet (Key, Vec<(Key, Value)>)=
+- =HIncrBy (Key, Key, Count)=
+- =HLen (Key)=
+- =HDel (Key, Vec<Key>)=
+- =HVals (Key)=
+- =HStrLen (Key, Key)=
+- =HSetNX (Key, Key, Value)=
+
+
+*** SetOps
+
+- =SAdd (Key, Vec<Value>)=
+- =SCard (Key)=
+- =SDiff (Vec<Value>)=
+- =SDiffStore (Key, Vec<Value>)=
+- =SInter (Vec<Value>)=
+- =SInterStore (Key, Vec<Value>)=
+- =SIsMember (Key, Value)=
+- =SMembers (Key)=
+- =SMove (Key, Key, Value)=
+- =SPop (Key, Option<Count>)=
+- =SRandMembers (Key, Option<Count>)=
+- =SRem (Key, Vec<Value>)=
+- =SUnion (Vec<Value>)=
+- =SUnionStore (Key, Vec<Value>)=
+
+
+*** ZSetOps
+
+- =ZAdd (Key, Vec<(Score, Key)>)=
+- =ZRem (Key, Vec<Key>)=
+- =ZRange (Key, Score, Score)=
+- =ZCard (Key)=
+- =ZScore (Key, Key)=
+- =ZPopMax (Key, Count)=
+- =ZPopMin (Key, Count)=
+- =ZRank (Key, Key)=
+
+
+*** BloomOps
+
+- =BInsert (Key, Value)=
+- =BContains (Key, Value)=
+
+

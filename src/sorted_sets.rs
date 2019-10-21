@@ -1,9 +1,8 @@
 use crate::types::{Count, Index, Key, ReturnValue, Score, StateRef};
-use crate::{make_reader, make_writer};
+use crate::{make_reader, make_writer, op_variants};
 
-/// ZSet Ops
-#[derive(Clone, Debug)]
-pub enum ZSetOps {
+op_variants! {
+    ZSetOps,
     ZAdd(Key, Vec<(Score, Key)>),
     ZRem(Key, Vec<Key>),
     ZRange(Key, Score, Score),
@@ -11,7 +10,7 @@ pub enum ZSetOps {
     ZScore(Key, Key),
     ZPopMax(Key, Count),
     ZPopMin(Key, Count),
-    ZRank(Key, Key),
+    ZRank(Key, Key)
 }
 
 make_reader!(zsets, read_zsets);

@@ -1,11 +1,10 @@
 use crate::timeouts::blocking_key_timeout;
 use crate::types::{Count, Index, Key, ReturnValue, StateRef, UTimeout, Value};
-use crate::{make_reader, make_writer};
+use crate::{make_reader, make_writer, op_variants};
 use std::collections::VecDeque;
 
-#[derive(Debug, Clone)]
-pub enum ListOps {
-    // List Operations
+op_variants! {
+    ListOps,
     LIndex(Key, Index),
     LLen(Key),
     LPop(Key),
@@ -19,7 +18,7 @@ pub enum ListOps {
     RPushX(Key, Value),
     RPopLPush(Key, Key),
     BLPop(Key, UTimeout),
-    BRPop(Key, UTimeout),
+    BRPop(Key, UTimeout)
 }
 
 make_reader!(lists, read_lists);

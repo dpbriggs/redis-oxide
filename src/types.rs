@@ -50,7 +50,7 @@ pub const NULL_ARRAY: &str = "*-1\r\n";
 pub const EMPTY_ARRAY: &str = "*0\r\n";
 
 /// Convenience type for returns value. Maps directly to RedisValues.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ReturnValue {
     Ok,
     StringRes(Value),
@@ -59,9 +59,6 @@ pub enum ReturnValue {
     Array(Vec<ReturnValue>),
     IntRes(i64),
     Nil,
-    // TODO: Figure out how to get the futures working properly.
-    // FutureRes(Box<ReturnValue>, Box<Future<Item = (), Error = ()> + Send>),
-    // FutureResValue(Box<Future<Item = (), Error = ()> + Send>),
 }
 
 /// Convenience trait to convert Count to ReturnValue.

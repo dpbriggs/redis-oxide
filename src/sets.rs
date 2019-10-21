@@ -1,9 +1,9 @@
+use crate::op_variants;
 use crate::types::{Count, Key, ReturnValue, StateRef, Value};
 use std::collections::HashSet;
 
-#[derive(Debug, Clone)]
-pub enum SetOps {
-    // Set Operations
+op_variants! {
+    SetOps,
     SAdd(Key, Vec<Value>),
     SCard(Key),
     SDiff(Vec<Value>),
@@ -17,7 +17,7 @@ pub enum SetOps {
     SRandMembers(Key, Option<Count>),
     SRem(Key, Vec<Value>),
     SUnion(Vec<Value>),
-    SUnionStore(Key, Vec<Value>),
+    SUnionStore(Key, Vec<Value>)
 }
 
 pub enum SetAction {

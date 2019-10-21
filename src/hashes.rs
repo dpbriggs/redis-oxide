@@ -1,10 +1,10 @@
+use crate::op_variants;
 use crate::types::{Count, Key, ReturnValue, StateRef, Value};
 use crate::{make_reader, make_writer};
 use std::collections::hash_map::Entry;
 
-/// Hash ops
-#[derive(Debug, Clone)]
-pub enum HashOps {
+op_variants! {
+    HashOps,
     HGet(Key, Key),
     HSet(Key, Key, Value),
     HExists(Key, Key),
@@ -17,7 +17,7 @@ pub enum HashOps {
     HDel(Key, Vec<Key>),
     HVals(Key),
     HStrLen(Key, Key),
-    HSetNX(Key, Key, Value),
+    HSetNX(Key, Key, Value)
 }
 
 macro_rules! ops_error {

@@ -1,13 +1,19 @@
-use crate::make_reader;
 use crate::types::{Key, RedisBool, ReturnValue, StateRef, Value};
+use crate::{make_reader, op_variants};
 use growable_bloom_filter::GrowableBloom;
 
-#[derive(Debug, Clone)]
-pub enum BloomOps {
-    // Key Value
+op_variants! {
+    BloomOps,
     BInsert(Key, Value),
-    BContains(Key, Value),
+    BContains(Key, Value)
 }
+
+// #[derive(Debug, Clone)]
+// pub enum BloomOps {
+//     // Key Value
+//     BInsert(Key, Value),
+//     BContains(Key, Value),
+// }
 
 const DESIRED_FAILURE_RATE: f64 = 0.05;
 const EST_INSERTS: usize = 10;

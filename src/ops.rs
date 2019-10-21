@@ -357,6 +357,7 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
             let keys = values_from_tail(&tail)?;
             ok!(MiscOps::Exists(keys))
         }
+        "printcmds" => ok!(MiscOps::PrintCmds(true)),
         // Sets
         "sadd" => {
             let (set_key, vals) = get_key_and_tail(array)?;
