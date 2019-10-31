@@ -4,6 +4,14 @@ version = "0.1.1"
 authors = ["David Briggs <david@dpbriggs.ca>"]
 edition = "2018"
 
+[lib]
+name = "redis_oxide"
+path = "src/lib.rs"
+
+[[bin]]
+name = "redis-oxide"
+path = "src/main.rs"
+
 [dependencies]
 tokio = "0.2.0-alpha.6"
 shlex = "0.1.1"
@@ -12,8 +20,6 @@ rand = "0.6.5"
 tokio-codec = "0.2.0-alpha.6"
 bytes = "0.4.12"
 combine = "3.8.1"
-# futures = "0.1.26"
-# futures-locks = "0.3.3"
 sloggers = "0.3.2"
 lazy_static = "1.4.0"
 slog = "2.4.1"
@@ -31,3 +37,8 @@ seahash = "3.0.6"
 [dev-dependencies]
 pretty_assertions = "0.6.1"
 proptest = "0.9.3"
+criterion = "0.3"
+
+[[bench]]
+name = "keys_benchmark"
+harness = false

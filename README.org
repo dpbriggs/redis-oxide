@@ -147,6 +147,7 @@ Therefore, if you want to do something like implement =hashes=, you will need to
 6. Test it! (follow existing testing bits; eg. =src/keys.rs=).
 7. Please add the commands to the list below.
    1. If you're using emacs, just fire up the server and evaluate the babel block below (see =README.org= source)
+   2. Alternatively, copy the script into a terminal and copy/paste the output below. (see raw =README.org=)
 
 ** Implemented Commands
 

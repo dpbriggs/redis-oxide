@@ -1,51 +1,12 @@
-#![deny(unsafe_code)]
-#![feature(test, async_closure)]
-#![warn(clippy::all, clippy::nursery)]
-#![feature(const_fn)]
-extern crate test;
-
-#[macro_use]
-extern crate serde_derive;
-
-#[macro_use]
-extern crate lazy_static;
-
+use redis_oxide::database::save_state_interval;
+use redis_oxide::database::{get_dump_file, load_state};
+use redis_oxide::logger::LOGGER;
+use redis_oxide::server::socket_listener;
+use redis_oxide::startup::{startup_message, Config};
 #[macro_use]
 extern crate slog;
 
-#[macro_use]
-extern crate combine;
-
-extern crate rmp_serde as rmps;
-
 use structopt::StructOpt;
-
-mod asyncresp;
-mod blocking;
-mod bloom;
-mod database;
-mod hashes;
-mod keys;
-mod lists;
-mod logger;
-#[macro_use]
-mod macros;
-mod data_structures;
-mod misc;
-mod ops;
-mod server;
-mod sets;
-mod sorted_sets;
-mod startup;
-mod state;
-mod timeouts;
-mod types;
-
-use self::database::save_state_interval;
-use self::database::{get_dump_file, load_state};
-use self::logger::LOGGER;
-use self::server::socket_listener;
-use self::startup::{startup_message, Config};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

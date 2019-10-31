@@ -153,40 +153,4 @@ mod test_keys {
             key_interact(KeyOps::Get(new), eng.clone()).await
         );
     }
-
-    mod bench {
-        use crate::keys::{key_interact, KeyOps};
-        use crate::types::State;
-        use std::sync::Arc;
-        use test::Bencher;
-
-        #[bench]
-        fn set_key(b: &mut Bencher) {
-            // use tokio::runtime::Runtime;
-            let eng = Arc::new(State::default());
-            b.iter(|| {
-                async {
-                    key_interact(KeyOps::Set(b"foo".to_vec(), b"bar".to_vec()), eng.clone()).await;
-                }
-            });
-        }
-        #[bench]
-        fn set_key_large(b: &mut Bencher) {
-            let eng = Arc::new(State::default());
-            let key: Vec<u8> = "X".repeat(10000).as_bytes().to_vec();
-            b.iter(|| {
-                async { key_interact(KeyOps::Set(b"foo".to_vec(), key.clone()), eng.clone()).await }
-            });
-        }
-        #[bench]
-        fn get_key(b: &mut Bencher) {
-            let eng = Arc::new(State::default());
-            b.iter(|| {
-                async {
-                    key_interact(KeyOps::Set(b"foo".to_vec(), b"bar".to_vec()), eng.clone()).await;
-                    key_interact(KeyOps::Get(b"foo".to_vec()), eng.clone()).await;
-                }
-            });
-        }
-    }
 }
