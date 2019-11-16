@@ -1,4 +1,4 @@
-name: Rust
+name: Redis Oxide
 
 on: [push]
 
@@ -8,11 +8,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v1
+    - name: Install nightly
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: nightly
+        override: true
     - name: Install Cargo Audit
       run: cargo install --force cargo-audit
-    - name: Generate Lock File
-      run: cargo generate-lockfile
     - name: Build
       run: cargo build --verbose
     - name: Run tests
