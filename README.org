@@ -14,6 +14,7 @@ It's under construction at the moment.
 
 ** Design
 
+
 =redis-oxide= is a black-box multi-threaded re-implementation of redis, backed by [[https://tokio.rs/][tokio]].
 It features data-structure key-space/lock granularity, written entirely in safe rust.
 It's currently protocol compatible with redis, so you should be able to test it out with your favourite tools.
@@ -132,7 +133,7 @@ The general design of =redis-oxide= is:
 Therefore, if you want to do something like implement =hashes=, you will need to:
 
 1. Add a new struct member in =State=.
-   1. This would look like like =hashes: Arc<RwLock<KeyHashes>>=, where =type KeyHashes = HashMap<Key, HashMap<Key,Value>>=.
+   1. This would look like like =hashes: RwLock<KeyHashes>=, where =type KeyHashes = HashMap<Key, HashMap<Key,Value>>=.
 2. Define a new file for your data type, =src/hashes.rs=.
    1. Keep your type definitions in =src/types.rs=!
 3. Create an enum to track your commands, =pub enum HashOps { HSet(Key, Key, Value) }=
