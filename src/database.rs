@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::timer::Interval;
+use tokio::time::interval;
 
 const SAVE_STATE_PERIOD_SEC: u64 = 60;
 const SAVE_STATE_PERIOD: u64 = SAVE_STATE_PERIOD_SEC * 1000;
@@ -132,9 +132,9 @@ pub fn save_state(state: StateRef, dump_file: DumpFile) {
 ///
 /// Panics if state fails to dump.
 pub async fn save_state_interval(state: StateRef, dump_file: DumpFile) {
-    let mut interval = Interval::new_interval(Duration::from_millis(SAVE_STATE_PERIOD));
+    let mut interval = interval(Duration::from_millis(SAVE_STATE_PERIOD));
     loop {
-        interval.next().await;
+        interval.tick().await;
         let commands_ran_since_save = state.commands_ran_since_save.load(Ordering::SeqCst);
         if commands_ran_since_save != 0 {
             state.commands_ran_since_save.store(0, Ordering::SeqCst);

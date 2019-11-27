@@ -5,7 +5,7 @@ use redis_oxide::keys::{key_interact, KeyOps};
 use redis_oxide::ops::{op_interact, translate};
 use redis_oxide::types::{RedisValue, ReturnValue, State};
 use std::sync::Arc;
-use tokio::codec::Decoder;
+use tokio_util::codec::Decoder;
 
 fn bench_parsing(c: &mut Criterion) {
     let buf: String = std::iter::repeat("a").take(100).collect();
@@ -14,7 +14,7 @@ fn bench_parsing(c: &mut Criterion) {
     group.throughput(Throughput::Bytes(buf.len() as u64 + 3));
     group.bench_function("simple_string", |b| {
         let _ = b.iter(|| {
-            let mut buf = BytesMut::from(format!("+{}\r\n", buf));
+            let mut buf = BytesMut::from(format!("+{}\r\n", buf).as_str());
             decoder
                 .decode(black_box(&mut buf))
                 .expect("parsing to work");
@@ -62,7 +62,7 @@ fn bench_full_life_cycle(c: &mut Criterion) {
                 let mut decoder = RedisValueCodec::default();
                 let s = Arc::new(State::default());
                 let scc = "*3\r\n$3\r\nset\r\n$3\r\nfoo\r\n$3\r\nbar\r\n";
-                let mut buf = BytesMut::from(format!("{}", scc));
+                let mut buf = BytesMut::from(format!("{}", scc).as_str());
                 let res = decoder
                     .decode(black_box(&mut buf))
                     .expect("parsing to work")

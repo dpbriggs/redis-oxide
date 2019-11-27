@@ -13,31 +13,36 @@ name = "redis-oxide"
 path = "src/main.rs"
 
 [dependencies]
-tokio = "0.2.0-alpha.6"
+tokio = { version = "0.2", features = ["full"] }
+tokio-util = { version = "0.2", features = ["codec"] }
+# tokio-util = "0.2.0"
+# tokio = "0.2.0-alpha.6"
 shlex = "0.1.1"
 promptly = "0.1.5"
-rand = "0.6.5"
-tokio-codec = "0.2.0-alpha.6"
-bytes = "0.4.12"
+rand = "0.7.2"
+# tokio-codec = "0.2.0-alpha.6"
+bytes = "0.5.0"
 combine = "3.8.1"
-sloggers = "0.3.2"
+sloggers = "0.3.4"
 lazy_static = "1.4.0"
-slog = "2.4.1"
-serde = { version = "1.0.90", features = ["rc"] }
-serde_derive = "1.0.90"
-bincode = "1.1.3"
-structopt = "0.2.15"
-directories = "1.0.2"
-parking_lot = { version = "0.8.0", features = ["serde"] }
-rmp-serde = "0.13.7"
+slog = "2.5.2"
+serde = { version = "1.0.103", features = ["rc"] }
+serde_derive = "1.0.103"
+bincode = "1.2.0"
+structopt = "0.3.5"
+directories = "2.0.2"
+parking_lot = { version = "0.9.0", features = ["serde"] }
+rmp-serde = "0.14.0"
 spin = "0.5.2"
-growable-bloom-filter = "0.2.0"
+growable-bloom-filter = "0.2.1"
 seahash = "3.0.6"
+futures = "0.3.1"
+futures-util = "0.3.1"
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"
-proptest = "0.9.3"
-criterion = "0.3"
+proptest = "0.9.4"
+criterion = "0.3.0"
 
 [[bench]]
 name = "keys_benchmark"

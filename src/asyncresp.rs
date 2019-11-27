@@ -6,7 +6,7 @@ use crate::types::{RedisValue, NULL_ARRAY, NULL_BULK_STRING};
 
 use bytes::BytesMut;
 use std::net::AddrParseError;
-use tokio::codec::{Decoder, Encoder};
+use tokio_util::codec::{Decoder, Encoder};
 
 use combine;
 use combine::byte::{byte, crlf, take_until_bytes};
@@ -235,14 +235,14 @@ mod async_resp_tests {
     use pretty_assertions::assert_eq;
     use proptest::collection::vec;
     use proptest::prelude::*;
-    use tokio::codec::{Decoder, Encoder};
+    use tokio_util::codec::{Decoder, Encoder};
 
     proptest! {
         #[test]
         fn proptest_no_crash_utf8(input: String) {
             let mut decoder = RedisValueCodec::default();
             // Only care that it doesn't crash.
-            let _ = decoder.decode(&mut BytesMut::from(input.clone()));
+            let _ = decoder.decode(&mut BytesMut::from(input.as_str()));
        }
         #[test]
         fn proptest_no_crash_non_utf8(input in vec(any::<u8>(), 255)) {
@@ -324,7 +324,7 @@ mod async_resp_tests {
     }
 
     fn ezs() -> Value {
-        "hello".as_bytes().to_vec()
+        b"hello".to_vec()
     }
 
     #[test]
@@ -335,7 +335,7 @@ mod async_resp_tests {
 
         let t = RedisValue::SimpleString(ezs());
         let s = "+hello\r\n+hello\r\n";
-        generic_test_arr(s, vec![t.clone(), t.clone()]);
+        generic_test_arr(s, vec![t.clone(), t]);
     }
 
     #[test]
@@ -346,7 +346,7 @@ mod async_resp_tests {
 
         let t = RedisValue::Error(ezs());
         let s = "-hello\r\n-hello\r\n";
-        generic_test_arr(s, vec![t.clone(), t.clone()]);
+        generic_test_arr(s, vec![t.clone(), t]);
     }
 
     #[test]
@@ -356,8 +356,8 @@ mod async_resp_tests {
         generic_test(s, t);
 
         let inner = vec![
-            RedisValue::BulkString("foo".as_bytes().to_vec()),
-            RedisValue::BulkString("bar".as_bytes().to_vec()),
+            RedisValue::BulkString(b"foo".to_vec()),
+            RedisValue::BulkString(b"bar".to_vec()),
         ];
         let t = RedisValue::Array(inner);
         let s = "*2\r\n$3\r\nfoo\r\n$3\r\nbar\r\n";
@@ -373,7 +373,7 @@ mod async_resp_tests {
             RedisValue::Int(2),
             RedisValue::Int(3),
             RedisValue::Int(4),
-            RedisValue::BulkString("foobar".as_bytes().to_vec()),
+            RedisValue::BulkString(b"foobar".to_vec()),
         ];
         let t = RedisValue::Array(inner);
         let s = "*5\r\n:1\r\n:2\r\n:3\r\n:4\r\n$6\r\nfoobar\r\n";
@@ -386,8 +386,8 @@ mod async_resp_tests {
                 RedisValue::Int(3),
             ]),
             RedisValue::Array(vec![
-                RedisValue::SimpleString("Foo".as_bytes().to_vec()),
-                RedisValue::Error("Bar".as_bytes().to_vec()),
+                RedisValue::SimpleString(b"Foo".to_vec()),
+                RedisValue::Error(b"Bar".to_vec()),
             ]),
         ];
         let t = RedisValue::Array(inner);
@@ -395,9 +395,9 @@ mod async_resp_tests {
         generic_test(s, t);
 
         let inner = vec![
-            RedisValue::BulkString("foo".as_bytes().to_vec()),
+            RedisValue::BulkString(b"foo".to_vec()),
             RedisValue::NullBulkString,
-            RedisValue::BulkString("bar".as_bytes().to_vec()),
+            RedisValue::BulkString(b"bar".to_vec()),
         ];
         let t = RedisValue::Array(inner);
         let s = "*3\r\n$3\r\nfoo\r\n$-1\r\n$3\r\nbar\r\n";
@@ -414,7 +414,7 @@ mod async_resp_tests {
         let s = "$5\r\nhello\r\n";
         generic_test(s, t);
 
-        let t = RedisValue::BulkString("".as_bytes().to_vec());
+        let t = RedisValue::BulkString(b"".to_vec());
         let s = "$0\r\n\r\n";
         generic_test(s, t);
     }

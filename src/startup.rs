@@ -8,7 +8,7 @@ use std::path::PathBuf;
     name = "redis-oxide",
     about = "A multi-threaded implementation of redis written in rust 🦀"
 )]
-#[structopt(raw(setting = "structopt::clap::AppSettings::ColoredHelp"))]
+// #[structopt(name = "redis-oxide")]
 pub struct Config {
     /// Database Dump File Directory Location
     #[structopt(short = "d", long = "dump-file", parse(from_os_str))]

@@ -4,7 +4,7 @@ use crate::types::{Key, ReturnValue, StateRef, UTimeout};
 use std::future::Future;
 use std::time::Duration;
 // use tokio::timer::Interval;
-use tokio::timer::Timeout;
+use tokio::time;
 
 pub async fn blocking_key_timeout(
     f: YieldingFn,
@@ -23,7 +23,7 @@ async fn timeout<T: Future<Output = ReturnValue>>(
     state: StateRef,
     receipt: Receipt,
 ) -> ReturnValue {
-    match Timeout::new(fut, Duration::from_secs(secs as u64)).await {
+    match time::timeout(Duration::from_secs(secs as u64), fut).await {
         Ok(ret) => ret,
         Err(_) => {
             let mut rm = state.reciept_map.lock();
