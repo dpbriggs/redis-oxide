@@ -39,11 +39,7 @@ fn incr_and_save_if_required(state: StateRef, dump_file: DumpFile) {
 /// thread pool.
 async fn process(socket: TcpStream, state: StateRef, dump_file: DumpFile) {
     tokio::spawn(async move {
-        // let transport = Framed::new(socket, RedisValueCodec::default());
         let mut transport = RedisValueCodec::default().framed(socket);
-        // for redis_value in transport.await {
-        //     println!("{:?}", redis_value);
-        // }
         while let Some(redis_value) = transport.next().await {
             if let Err(e) = redis_value {
                 error!(LOGGER, "Error recieving redis value {:?}", e);
@@ -55,7 +51,9 @@ async fn process(socket: TcpStream, state: StateRef, dump_file: DumpFile) {
                     // Step 1: Execute the operation the operation (from translate above)
                     let res: ReturnValue = op_interact(op, state.clone()).await;
                     // Step 2: Update commands_ran_since_save counter, and save if necessary
-                    incr_and_save_if_required(state.clone(), dump_file.clone());
+                    if !state.memory_only {
+                        incr_and_save_if_required(state.clone(), dump_file.clone());
+                    }
                     // Step 3: Finally Return
                     res.into()
                 }

@@ -130,6 +130,8 @@ pub struct State {
     pub commands_threshold: u64,
     #[serde(skip)]
     pub reciept_map: Mutex<RecieptMap>,
+    #[serde(skip)]
+    pub memory_only: bool,
 }
 
 /// Mapping of a ReturnValue to a RedisValue.

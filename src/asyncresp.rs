@@ -56,6 +56,7 @@ where
     }
 }
 
+// TODO: Support inline commands
 parser! {
    type PartialState = AnySendPartialState;
    fn redis_parser['a, I]()(I) -> Result<RedisValue, String>
@@ -112,6 +113,7 @@ parser! {
     }
 }
 
+// TODO: Make a more sensible error enum
 #[derive(Debug)]
 pub enum R02Error {
     IOError(std::io::Error),

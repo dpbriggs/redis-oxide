@@ -51,6 +51,7 @@ pub fn load_state(dump_file: DumpFile, config: &Config) -> Result<StateRef, Box<
     contents.seek(SeekFrom::Start(0))?;
     let mut state: State = rmps::decode::from_read(&*contents)?;
     state.commands_threshold = config.ops_until_save;
+    state.memory_only = config.memory_only;
 
     Ok(Arc::new(state))
 }
