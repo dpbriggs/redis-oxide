@@ -1,4 +1,5 @@
-use crate::types::{Count, Key, ReturnValue, StateRef};
+use crate::types::{Count, Index, Key, ReturnValue, StateRef, StateStoreRef, Value};
+// use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub enum MiscOps {
@@ -6,7 +7,11 @@ pub enum MiscOps {
     Exists(Vec<Key>),
     Pong,
     FlushAll,
-    PrintCmds(bool),
+    FlushDB,
+    // SwapDB(Index, Index),  // TODO: Need to figure out how to best sync clients.
+    Echo(Value),
+    PrintCmds,
+    Select(Index),
 }
 
 macro_rules! create_commands_list {
@@ -30,7 +35,6 @@ lazy_static! {
         use crate::lists::OP_VARIANTS as LIST_VARIANTS;
         use crate::sets::OP_VARIANTS as SET_VARIANTS;
         use crate::sorted_sets::OP_VARIANTS as ZSET_VARIANTS;
-        // let mut res = Vec::new();
         create_commands_list!(
             KEY_VARIANTS,
             LIST_VARIANTS,
@@ -39,48 +43,33 @@ lazy_static! {
             ZSET_VARIANTS,
             BLOOM_VARIANTS
         )
-        // res.push(
-        //     HASH_VARIANTS
-        //         .iter()
-        //         .cloned()
-        //         .map(|s| s.into_bytes())
-        //         .collect(),
-        // );
-        // res.push(
-        //     SET_VARIANTS
-        //         .iter()
-        //         .cloned()
-        //         .map(|s| s.into_bytes())
-        //         .collect(),
-        // );
-        // res.push(
-        //     ZSET_VARIANTS
-        //         .iter()
-        //         .cloned()
-        //         .map(|s| s.into_bytes())
-        //         .collect(),
-        // );
-        // res.push(
-        //     BLOOM_VARIANTS
-        //         .iter()
-        //         .cloned()
-        //         .map(|s| s.into_bytes())
-        //         .collect(),
-        // );
-        // res
     };
 }
 
-pub async fn misc_interact(misc_op: MiscOps, state: StateRef) -> ReturnValue {
+pub async fn misc_interact(
+    misc_op: MiscOps,
+    state: &mut StateRef,
+    state_store: StateStoreRef,
+) -> ReturnValue {
     match misc_op {
         MiscOps::Pong => ReturnValue::StringRes(b"PONG".to_vec()),
         MiscOps::FlushAll => {
-            state.kv.write().clear();
-            state.sets.write().clear();
-            state.lists.write().clear();
-            state.hashes.write().clear();
-            state.zsets.write().clear();
-            state.blooms.write().clear();
+            let clear = |state: &StateRef| {
+                state.kv.write().clear();
+                state.sets.write().clear();
+                state.lists.write().clear();
+                state.hashes.write().clear();
+                state.zsets.write().clear();
+                state.blooms.write().clear();
+            };
+            let state_guard = state_store.states.lock();
+            for state in state_guard.values() {
+                clear(state);
+            }
+            ReturnValue::Ok
+        }
+        MiscOps::FlushDB => {
+            *state = Default::default();
             ReturnValue::Ok
         }
         MiscOps::Exists(keys) => ReturnValue::IntRes(
@@ -93,10 +82,22 @@ pub async fn misc_interact(misc_op: MiscOps, state: StateRef) -> ReturnValue {
             let mut kv_keys: Vec<Key> = state.kv.read().keys().cloned().collect();
             let mut set_keys: Vec<Key> = state.sets.read().keys().cloned().collect();
             let mut list_keys: Vec<Key> = state.lists.read().keys().cloned().collect();
+            let mut hash_keys: Vec<Key> = state.hashes.read().keys().cloned().collect();
+            let mut zset_keys: Vec<Key> = state.zsets.read().keys().cloned().collect();
+            let mut bloom_keys: Vec<Key> = state.blooms.read().keys().cloned().collect();
             kv_keys.append(&mut set_keys);
             kv_keys.append(&mut list_keys);
+            kv_keys.append(&mut hash_keys);
+            kv_keys.append(&mut zset_keys);
+            kv_keys.append(&mut bloom_keys);
             ReturnValue::MultiStringRes(kv_keys)
         }
-        MiscOps::PrintCmds(_) => (*ALL_COMMANDS).clone(),
+        MiscOps::PrintCmds => (*ALL_COMMANDS).clone(),
+        MiscOps::Select(index) => {
+            let state_store = state_store.get_or_create(index);
+            *state = state_store;
+            ReturnValue::Ok
+        }
+        MiscOps::Echo(val) => ReturnValue::StringRes(val),
     }
 }

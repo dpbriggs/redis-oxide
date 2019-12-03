@@ -107,6 +107,19 @@ type KeyZSet = HashMap<Key, SortedSet>;
 /// Canonical type for Key-Bloom storage.
 type KeyBloom = HashMap<Key, GrowableBloom>;
 
+#[derive(Default, Debug, Serialize, Deserialize)]
+pub struct StateStore {
+    pub states: Mutex<HashMap<Index, StateRef>>,
+    #[serde(skip)]
+    pub commands_ran_since_save: AtomicU64,
+    #[serde(skip)]
+    pub commands_threshold: u64,
+    #[serde(skip)]
+    pub memory_only: bool,
+}
+
+pub type StateStoreRef = Arc<StateStore>;
+
 pub type StateRef = Arc<State>;
 /// The state stored by redis-oxide. These fields are the ones
 /// used by the various datastructure files (keys.rs, etc)
@@ -125,13 +138,7 @@ pub struct State {
     #[serde(default)]
     pub blooms: RwLock<KeyBloom>,
     #[serde(skip)]
-    pub commands_ran_since_save: AtomicU64,
-    #[serde(skip)]
-    pub commands_threshold: u64,
-    #[serde(skip)]
     pub reciept_map: Mutex<RecieptMap>,
-    #[serde(skip)]
-    pub memory_only: bool,
 }
 
 /// Mapping of a ReturnValue to a RedisValue.

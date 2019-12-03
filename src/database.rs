@@ -1,6 +1,6 @@
 use crate::logger::LOGGER;
 use crate::startup::Config;
-use crate::types::{DumpFile, State, StateRef};
+use crate::types::{DumpFile, StateStore, StateStoreRef};
 use directories::ProjectDirs;
 use parking_lot::Mutex;
 use std::error::Error;
@@ -33,7 +33,7 @@ macro_rules! fatal_panic {
 }
 
 /// Dump the current state to the dump_file
-fn dump_state(state: &State, dump_file: &mut File) -> Result<(), Box<dyn Error>> {
+fn dump_state(state: StateStoreRef, dump_file: &mut File) -> Result<(), Box<dyn Error>> {
     dump_file.seek(SeekFrom::Start(0))?;
     rmps::encode::write(dump_file, &state)
         .map_err(|e| fatal_panic!("Could not write state!", e.description()))
@@ -42,18 +42,18 @@ fn dump_state(state: &State, dump_file: &mut File) -> Result<(), Box<dyn Error>>
 }
 
 /// Load state from the dump_file
-pub fn load_state(dump_file: DumpFile, config: &Config) -> Result<StateRef, Box<dyn Error>> {
+pub fn load_state(dump_file: DumpFile, config: &Config) -> Result<StateStoreRef, Box<dyn Error>> {
     let mut contents = dump_file.lock();
     if contents.metadata()?.len() == 0 {
-        return Ok(Arc::new(State::default()));
+        return Ok(Arc::new(StateStore::default()));
     }
 
     contents.seek(SeekFrom::Start(0))?;
-    let mut state: State = rmps::decode::from_read(&*contents)?;
-    state.commands_threshold = config.ops_until_save;
-    state.memory_only = config.memory_only;
+    let mut state_store: StateStore = rmps::decode::from_read(&*contents)?;
+    state_store.commands_threshold = config.ops_until_save;
+    state_store.memory_only = config.memory_only;
 
-    Ok(Arc::new(state))
+    Ok(Arc::new(state_store))
 }
 
 /// Make the data directory (directory where the dump file lives)
@@ -111,14 +111,14 @@ pub fn get_dump_file(config: &Config) -> DumpFile {
     Arc::new(Mutex::new(opened_file))
 }
 
-pub fn save_state(state: StateRef, dump_file: DumpFile) {
+pub fn save_state(state: StateStoreRef, dump_file: DumpFile) {
     info!(
         LOGGER,
         "Saving state ({}s or >={} ops ran)...", SAVE_STATE_PERIOD_SEC, state.commands_threshold
     );
     match dump_file.try_lock() {
         Some(mut file) => {
-            if let Err(e) = dump_state(&state, &mut file) {
+            if let Err(e) = dump_state(state, &mut file) {
                 fatal_panic!("FAILED TO DUMP STATE!", e.description());
             }
         }
@@ -132,7 +132,7 @@ pub fn save_state(state: StateRef, dump_file: DumpFile) {
 /// Save the current State to Dumpfile.
 ///
 /// Panics if state fails to dump.
-pub async fn save_state_interval(state: StateRef, dump_file: DumpFile) {
+pub async fn save_state_interval(state: StateStoreRef, dump_file: DumpFile) {
     let mut interval = interval(Duration::from_millis(SAVE_STATE_PERIOD));
     loop {
         interval.tick().await;

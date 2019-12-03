@@ -5,7 +5,7 @@ use crate::bloom::{bloom_interact, BloomOps};
 use crate::hashes::{hash_interact, HashOps};
 use crate::keys::{key_interact, KeyOps};
 use crate::lists::{list_interact, ListOps};
-use crate::misc::{misc_interact, MiscOps};
+use crate::misc::MiscOps;
 use crate::sets::{set_interact, SetOps};
 use crate::sorted_sets::{zset_interact, ZSetOps};
 use crate::types::{ReturnValue, StateRef};
@@ -33,10 +33,10 @@ pub async fn op_interact(op: Ops, state: StateRef) -> ReturnValue {
         Ops::Keys(op) => key_interact(op, state).await,
         Ops::Sets(op) => set_interact(op, state).await,
         Ops::Lists(op) => list_interact(op, state).await,
-        Ops::Misc(op) => misc_interact(op, state).await,
         Ops::Hashes(op) => hash_interact(op, state).await,
         Ops::ZSets(op) => zset_interact(op, state).await,
         Ops::Blooms(op) => bloom_interact(op, state).await,
+        _ => unreachable!(),
     }
 }
 
@@ -169,12 +169,14 @@ impl TryFrom<&RedisValue> for Count {
 
 // Translate single RedisValue inputs into an Ops
 // Used for commands like PING
+// TODO: Get rid of this
 fn translate_string(start: &[u8]) -> Result<Ops, OpsError> {
     let start = &String::from_utf8_lossy(start);
     match start.to_lowercase().as_ref() {
         "ping" => Ok(Ops::Misc(MiscOps::Pong)),
         "keys" => Ok(Ops::Misc(MiscOps::Keys)),
         "flushall" => Ok(Ops::Misc(MiscOps::FlushAll)),
+        "flushdb" => Ok(Ops::Misc(MiscOps::FlushDB)),
         _ => Err(OpsError::UnknownOp),
     }
 }
@@ -286,6 +288,9 @@ macro_rules! ok {
     (MiscOps::$OpName:ident($($OpArg:expr),*)) => {
         Ok(Ops::Misc(MiscOps::$OpName($( $OpArg ),*)))
     };
+    (MiscOps::$OpName:ident) => {
+        Ok(Ops::Misc(MiscOps::$OpName))
+    };
     (SetOps::$OpName:ident($($OpArg:expr),*)) => {
         Ok(Ops::Sets(SetOps::$OpName($( $OpArg ),*)))
     };
@@ -357,7 +362,7 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
             let keys = values_from_tail(&tail)?;
             ok!(MiscOps::Exists(keys))
         }
-        "printcmds" => ok!(MiscOps::PrintCmds(true)),
+        "printcmds" => ok!(MiscOps::PrintCmds),
         // Sets
         "sadd" => {
             let (set_key, vals) = get_key_and_tail(array)?;
@@ -665,6 +670,16 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
             let key = Key::try_from(tail[0])?;
             let value = Value::try_from(tail[1])?;
             ok!(BloomOps::BContains(key, value))
+        }
+        "select" => {
+            verify_size(&tail, 1)?;
+            let new_db = Index::try_from(tail[0])?;
+            ok!(MiscOps::Select(new_db))
+        }
+        "echo" => {
+            verify_size(&tail, 1)?;
+            let val = Value::try_from(tail[0])?;
+            ok!(MiscOps::Echo(val))
         }
         _ => Err(OpsError::UnknownOp),
     }
