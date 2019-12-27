@@ -35,13 +35,15 @@ lazy_static! {
         use crate::lists::OP_VARIANTS as LIST_VARIANTS;
         use crate::sets::OP_VARIANTS as SET_VARIANTS;
         use crate::sorted_sets::OP_VARIANTS as ZSET_VARIANTS;
+        use crate::stack::OP_VARIANTS as STACK_VARIANTS;
         create_commands_list!(
             KEY_VARIANTS,
             LIST_VARIANTS,
             HASH_VARIANTS,
             SET_VARIANTS,
             ZSET_VARIANTS,
-            BLOOM_VARIANTS
+            BLOOM_VARIANTS,
+            STACK_VARIANTS
         )
     };
 }

@@ -11,6 +11,7 @@ use std::fs::File;
 
 use crate::data_structures::receipt_map::RecieptMap;
 use crate::data_structures::sorted_set::SortedSet;
+use crate::data_structures::stack::Stack;
 
 /// These types are used by state and ops to actually perform useful work.
 pub type Value = Vec<u8>;
@@ -106,7 +107,10 @@ type KeyHash = HashMap<Key, HashMap<Key, Value>>;
 type KeyZSet = HashMap<Key, SortedSet>;
 /// Canonical type for Key-Bloom storage.
 type KeyBloom = HashMap<Key, GrowableBloom>;
+type KeyStack = HashMap<Key, Stack<Value>>;
 
+/// Top level database struct.
+/// Holds all StateRef dbs, and will hand them out on request.
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct StateStore {
     pub states: Mutex<HashMap<Index, StateRef>>,
@@ -118,9 +122,12 @@ pub struct StateStore {
     pub memory_only: bool,
 }
 
+/// Reference type for `StateStore`
 pub type StateStoreRef = Arc<StateStore>;
 
+/// Reference type for `State`
 pub type StateRef = Arc<State>;
+
 /// The state stored by redis-oxide. These fields are the ones
 /// used by the various datastructure files (keys.rs, etc)
 #[derive(Default, Debug, Serialize, Deserialize)]
@@ -137,6 +144,8 @@ pub struct State {
     pub zsets: RwLock<KeyZSet>,
     #[serde(default)]
     pub blooms: RwLock<KeyBloom>,
+    #[serde(default)]
+    pub stacks: RwLock<KeyStack>,
     #[serde(skip)]
     pub reciept_map: Mutex<RecieptMap>,
 }

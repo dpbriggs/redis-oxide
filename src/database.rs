@@ -13,6 +13,7 @@ use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::task;
 use tokio::time::interval;
 
 const SAVE_STATE_PERIOD_SEC: u64 = 60;
@@ -118,7 +119,7 @@ pub fn save_state(state: StateStoreRef, dump_file: DumpFile) {
     );
     match dump_file.try_lock() {
         Some(mut file) => {
-            if let Err(e) = dump_state(state, &mut file) {
+            if let Err(e) = task::block_in_place(|| dump_state(state, &mut file)) {
                 fatal_panic!("FAILED TO DUMP STATE!", e.description());
             }
         }
