@@ -30,7 +30,6 @@ impl<T: Clone> Stack<T> {
 #[cfg(test)]
 mod test_stack {
     use crate::data_structures::stack::Stack;
-    use crate::types::Count;
 
     #[test]
     fn test_push_pop() {
