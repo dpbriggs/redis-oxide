@@ -13,6 +13,7 @@ use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::task;
 use tokio::time::interval;
 
 const SAVE_STATE_PERIOD_SEC: u64 = 60;
@@ -36,7 +37,7 @@ macro_rules! fatal_panic {
 fn dump_state(state: StateStoreRef, dump_file: &mut File) -> Result<(), Box<dyn Error>> {
     dump_file.seek(SeekFrom::Start(0))?;
     rmps::encode::write(dump_file, &state)
-        .map_err(|e| fatal_panic!("Could not write state!", e.description()))
+        .map_err(|e| fatal_panic!("Could not write state!", e.to_string()))
         .unwrap();
     Ok(())
 }
@@ -70,7 +71,7 @@ fn make_data_dir(data_dir: &Path) {
             let err_msg = format!(
                 "Error! Cannot create path {}, error {}",
                 data_dir.to_string_lossy(),
-                e.description()
+                e.to_string()
             );
             fatal_panic!(err_msg);
         }
@@ -106,7 +107,7 @@ pub fn get_dump_file(config: &Config) -> DumpFile {
         .open(dump_file)
     {
         Ok(f) => f,
-        Err(e) => fatal_panic!(format!("Failed to open dump file! {}", e.description())),
+        Err(e) => fatal_panic!(format!("Failed to open dump file! {}", e.to_string())),
     };
     Arc::new(Mutex::new(opened_file))
 }
@@ -118,8 +119,8 @@ pub fn save_state(state: StateStoreRef, dump_file: DumpFile) {
     );
     match dump_file.try_lock() {
         Some(mut file) => {
-            if let Err(e) = dump_state(state, &mut file) {
-                fatal_panic!("FAILED TO DUMP STATE!", e.description());
+            if let Err(e) = task::block_in_place(|| dump_state(state, &mut file)) {
+                fatal_panic!("FAILED TO DUMP STATE!", e.to_string());
             }
         }
         None => debug!(

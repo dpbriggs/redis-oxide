@@ -8,13 +8,6 @@ op_variants! {
     BContains(Key, Value)
 }
 
-// #[derive(Debug, Clone)]
-// pub enum BloomOps {
-//     // Key Value
-//     BInsert(Key, Value),
-//     BContains(Key, Value),
-// }
-
 const DESIRED_FAILURE_RATE: f64 = 0.05;
 const EST_INSERTS: usize = 10;
 

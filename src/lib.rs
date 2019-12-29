@@ -34,6 +34,7 @@ pub mod ops;
 pub mod server;
 pub mod sets;
 pub mod sorted_sets;
+pub mod stack;
 pub mod startup;
 pub mod state;
 pub mod timeouts;

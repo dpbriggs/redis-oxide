@@ -8,6 +8,7 @@ use crate::lists::{list_interact, ListOps};
 use crate::misc::MiscOps;
 use crate::sets::{set_interact, SetOps};
 use crate::sorted_sets::{zset_interact, ZSetOps};
+use crate::stack::{stack_interact, StackOps};
 use crate::types::{ReturnValue, StateRef};
 
 use crate::types::{
@@ -24,6 +25,7 @@ pub enum Ops {
     Hashes(HashOps),
     ZSets(ZSetOps),
     Blooms(BloomOps),
+    Stacks(StackOps),
 }
 
 /// Top level interaction function. Used by the server to run
@@ -36,6 +38,7 @@ pub async fn op_interact(op: Ops, state: StateRef) -> ReturnValue {
         Ops::Hashes(op) => hash_interact(op, state).await,
         Ops::ZSets(op) => zset_interact(op, state).await,
         Ops::Blooms(op) => bloom_interact(op, state).await,
+        Ops::Stacks(op) => stack_interact(op, state).await,
         _ => unreachable!(),
     }
 }
@@ -302,6 +305,9 @@ macro_rules! ok {
     };
     (ZSetOps::$OpName:ident($($OpArg:expr),*)) => {
         Ok(Ops::ZSets(ZSetOps::$OpName($( $OpArg ),*)))
+    };
+    (StackOps::$OpName:ident($($OpArg:expr),*)) => {
+        Ok(Ops::Stacks(StackOps::$OpName($( $OpArg ),*)))
     };
     (BloomOps::$OpName:ident($($OpArg:expr),*)) => {
         Ok(Ops::Blooms(BloomOps::$OpName($( $OpArg ),*)))
@@ -680,6 +686,28 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
             verify_size(&tail, 1)?;
             let val = Value::try_from(tail[0])?;
             ok!(MiscOps::Echo(val))
+        }
+        // StackOps
+        "stpush" => {
+            verify_size(&tail, 2)?;
+            let key = Key::try_from(tail[0])?;
+            let val = Value::try_from(tail[1])?;
+            ok!(StackOps::STPush(key, val))
+        }
+        "stpop" => {
+            verify_size(&tail, 1)?;
+            let key = Key::try_from(tail[0])?;
+            ok!(StackOps::STPop(key))
+        }
+        "stpeek" => {
+            verify_size(&tail, 1)?;
+            let key = Key::try_from(tail[0])?;
+            ok!(StackOps::STPeek(key))
+        }
+        "stsize" => {
+            verify_size(&tail, 1)?;
+            let key = Key::try_from(tail[0])?;
+            ok!(StackOps::STSize(key))
         }
         _ => Err(OpsError::UnknownOp),
     }

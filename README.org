@@ -251,3 +251,11 @@ Therefore, if you want to do something like implement =hashes=, you will need to
 - =BContains (Key, Value)=
 
 
+*** StackOps
+
+- =STPush (Key, Value)=
+- =STPop (Key)=
+- =STPeek (Key)=
+- =STSize (Key)=
+
+
