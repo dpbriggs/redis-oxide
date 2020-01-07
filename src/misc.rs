@@ -1,5 +1,4 @@
 use crate::types::{Count, Index, Key, ReturnValue, StateRef, StateStoreRef, Value};
-// use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub enum MiscOps {
@@ -12,6 +11,7 @@ pub enum MiscOps {
     Echo(Value),
     PrintCmds,
     Select(Index),
+    Info,
 }
 
 macro_rules! create_commands_list {
@@ -101,5 +101,13 @@ pub async fn misc_interact(
             ReturnValue::Ok
         }
         MiscOps::Echo(val) => ReturnValue::StringRes(val),
+        MiscOps::Info => {
+            let info: String = [
+                concat!("redis_version", ":", env!("CARGO_PKG_VERSION")),
+                "arch_bits:64",
+            ]
+            .join("\r\n");
+            ReturnValue::StringRes(info.into_bytes())
+        }
     }
 }

@@ -687,6 +687,10 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
             let val = Value::try_from(tail[0])?;
             ok!(MiscOps::Echo(val))
         }
+        "info" => {
+            verify_size(&tail, 0)?;
+            ok!(MiscOps::Info)
+        }
         // StackOps
         "stpush" => {
             verify_size(&tail, 2)?;
