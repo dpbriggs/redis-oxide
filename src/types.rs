@@ -1,3 +1,4 @@
+use bytes::Bytes;
 use dashmap::DashMap;
 use growable_bloom_filter::GrowableBloom;
 /// Common Types in the project.
@@ -44,6 +45,30 @@ pub enum RedisValue {
     Array(Vec<RedisValue>),
     NullArray,
     NullBulkString,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum RedisValueRef {
+    String(Bytes),
+    Error(Bytes),
+    Int(i64),
+    Array(Vec<RedisValueRef>),
+    NullArray,
+    NullBulkString,
+}
+
+// TODO: Get rid of this
+impl<'a> From<RedisValueRef> for RedisValue {
+    fn from(other: RedisValueRef) -> RedisValue {
+        match other {
+            RedisValueRef::String(v) => RedisValue::BulkString(v.to_vec()),
+            RedisValueRef::Error(e) => RedisValue::Error(e.to_vec()),
+            RedisValueRef::Int(i) => RedisValue::Int(i),
+            RedisValueRef::Array(a) => RedisValue::Array(a.into_iter().map(|i| i.into()).collect()),
+            RedisValueRef::NullBulkString => RedisValue::NullBulkString,
+            RedisValueRef::NullArray => RedisValue::NullArray,
+        }
+    }
 }
 
 /// Special constants in the RESP protocol.

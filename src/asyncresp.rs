@@ -1,8 +1,9 @@
+use bytes::Bytes;
 use std::convert::From;
 use std::io;
 use std::str;
 
-use crate::types::{RedisValue, NULL_ARRAY, NULL_BULK_STRING};
+use crate::types::{RedisValue, RedisValueRef, NULL_ARRAY, NULL_BULK_STRING};
 
 use bytes::BytesMut;
 use tokio_util::codec::{Decoder, Encoder};
@@ -25,17 +26,55 @@ impl From<std::io::Error> for RESPError {
 #[derive(Default)]
 pub struct RespParser;
 
-type RedisResult = Result<Option<(usize, RedisValue)>, RESPError>;
+type RedisResult = Result<Option<(usize, RedisBufSplit)>, RESPError>;
+
+enum RedisBufSplit {
+    String(BufSplit),
+    Error(BufSplit),
+    Array(Vec<RedisBufSplit>),
+    NullBulkString,
+    NullArray,
+    Int(i64),
+}
+
+impl RedisBufSplit {
+    fn to_redis_value(self, buf: &Bytes) -> RedisValueRef {
+        match self {
+            RedisBufSplit::String(bfs) => RedisValueRef::String(bfs.view_bytes(&buf)),
+            RedisBufSplit::Error(bfs) => RedisValueRef::Error(bfs.view_bytes(&buf)),
+            RedisBufSplit::Array(arr) => {
+                RedisValueRef::Array(arr.into_iter().map(|bfs| bfs.to_redis_value(buf)).collect())
+            }
+            RedisBufSplit::NullArray => RedisValueRef::NullArray,
+            RedisBufSplit::NullBulkString => RedisValueRef::NullBulkString,
+            RedisBufSplit::Int(i) => RedisValueRef::Int(i),
+        }
+    }
+}
+
+struct BufSplit(usize, usize);
+
+impl BufSplit {
+    #[inline]
+    fn copy_bytes<'a>(&self, buf: &'a BytesMut) -> &'a [u8] {
+        &buf[self.0..self.1]
+    }
+
+    #[inline]
+    fn view_bytes(&self, buf: &Bytes) -> Bytes {
+        buf.slice(self.0..self.1)
+    }
+}
 
 #[inline]
-fn word(buf: &mut BytesMut, pos: usize) -> Option<(usize, &[u8])> {
+fn word(buf: &mut BytesMut, pos: usize) -> Option<(usize, BufSplit)> {
     if buf.len() <= pos {
         return None;
     }
     match buf[pos..].iter().position(|b| *b == b'\r') {
         Some(end) => {
             if end + 1 < buf.len() {
-                Some((pos + end + 2, &buf[pos..pos + end]))
+                Some((pos + end + 2, BufSplit(pos, pos + end)))
             } else {
                 None
             }
@@ -44,13 +83,14 @@ fn word(buf: &mut BytesMut, pos: usize) -> Option<(usize, &[u8])> {
     }
 }
 
-fn int(buf: &mut BytesMut, pos: usize) -> Result<Option<(usize, i64)>, RESPError> {
+fn int(mut buf: &mut BytesMut, pos: usize) -> Result<Option<(usize, i64)>, RESPError> {
     if buf.len() <= pos {
         return Ok(None);
     }
     match word(buf, pos) {
         Some((pos, word)) => {
-            let s = str::from_utf8(word).map_err(|_| RESPError::IntParseFailure)?;
+            let s = str::from_utf8(word.copy_bytes(&mut buf))
+                .map_err(|_| RESPError::IntParseFailure)?;
             let i = s.parse().map_err(|_| RESPError::IntParseFailure)?;
             Ok(Some((pos, i)))
         }
@@ -63,14 +103,14 @@ fn bulk_string(buf: &mut BytesMut, pos: usize) -> RedisResult {
         return Ok(None);
     }
     match int(buf, pos)? {
-        Some((pos, -1)) => Ok(Some((pos, RedisValue::NullBulkString))),
+        Some((pos, -1)) => Ok(Some((pos, RedisBufSplit::NullBulkString))),
         Some((pos, size)) if size >= 0 => {
             let total_size = pos + size as usize;
             if buf.len() < total_size + 2 {
                 Ok(None)
             } else {
-                let bulk_s = RedisValue::BulkString(buf[pos..total_size].to_vec());
-                Ok(Some((total_size + 2, bulk_s)))
+                let bb = RedisBufSplit::String(BufSplit(pos, total_size));
+                Ok(Some((total_size + 2, bb)))
             }
         }
         Some((_pos, bad_size)) => Err(RESPError::BadBulkStringSize(bad_size)),
@@ -83,7 +123,7 @@ fn simple_string(buf: &mut BytesMut, pos: usize) -> RedisResult {
         return Ok(None);
     }
     match word(buf, pos) {
-        Some((pos, word)) => Ok(Some((pos, RedisValue::SimpleString(word.to_vec())))),
+        Some((pos, word)) => Ok(Some((pos, RedisBufSplit::String(word)))),
         None => Ok(None),
     }
 }
@@ -93,7 +133,7 @@ fn error(buf: &mut BytesMut, pos: usize) -> RedisResult {
         return Ok(None);
     }
     match word(buf, pos) {
-        Some((pos, word)) => Ok(Some((pos, RedisValue::Error(word.to_vec())))),
+        Some((pos, word)) => Ok(Some((pos, RedisBufSplit::Error(word)))),
         None => Ok(None),
     }
 }
@@ -103,7 +143,7 @@ fn resp_int(buf: &mut BytesMut, pos: usize) -> RedisResult {
         return Ok(None);
     }
     match int(buf, pos)? {
-        Some((pos, int)) => Ok(Some((pos, RedisValue::Int(int)))),
+        Some((pos, int)) => Ok(Some((pos, RedisBufSplit::Int(int)))),
         None => Ok(None),
     }
 }
@@ -111,7 +151,7 @@ fn resp_int(buf: &mut BytesMut, pos: usize) -> RedisResult {
 fn array(buf: &mut BytesMut, pos: usize) -> RedisResult {
     match int(buf, pos)? {
         None => Ok(None),
-        Some((pos, -1)) => Ok(Some((pos, RedisValue::NullArray))),
+        Some((pos, -1)) => Ok(Some((pos, RedisBufSplit::NullArray))),
         Some((pos, num_elements)) if num_elements >= 0 => {
             let mut values = Vec::with_capacity(num_elements as usize);
             let mut curr_pos = pos;
@@ -124,7 +164,7 @@ fn array(buf: &mut BytesMut, pos: usize) -> RedisResult {
                     None => return Ok(None),
                 }
             }
-            Ok(Some((curr_pos, RedisValue::Array(values))))
+            Ok(Some((curr_pos, RedisBufSplit::Array(values))))
         }
         _ => Err(RESPError::UnexpectedEnd), // TODO: Make proper error here,
     }
@@ -146,7 +186,7 @@ fn parse(buf: &mut BytesMut, pos: usize) -> RedisResult {
 }
 
 impl Decoder for RespParser {
-    type Item = RedisValue;
+    type Item = RedisValueRef;
     type Error = RESPError;
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         if buf.is_empty() {
@@ -155,8 +195,8 @@ impl Decoder for RespParser {
 
         match parse(buf, 0)? {
             Some((pos, value)) => {
-                buf.split_to(pos);
-                Ok(Some(value))
+                let our_data = buf.split_to(pos);
+                Ok(Some(value.to_redis_value(&our_data.freeze())))
             }
             None => Ok(None),
         }
@@ -213,7 +253,7 @@ fn write_redis_value(item: RedisValue, dst: &mut BytesMut) {
 #[cfg(test)]
 mod resp_parser_tests {
     use crate::asyncresp::RespParser;
-    use crate::types::{RedisValue, Value};
+    use crate::types::{RedisValue, RedisValueRef, Value};
     use bytes::BytesMut;
     use tokio_util::codec::{Decoder, Encoder};
 
@@ -231,7 +271,7 @@ mod resp_parser_tests {
             result_write.unwrap_err()
         );
 
-        assert_eq!(input.clone().as_bytes(), buf.as_ref());
+        assert_eq!(input.as_bytes(), buf.as_ref());
 
         assert!(
             result_read.as_ref().is_ok(),
@@ -251,15 +291,15 @@ mod resp_parser_tests {
         // TODO: Try to make this occur randomly
         let first: usize = input.len() / 2;
         let second = input.len() - first;
-        let mut first = BytesMut::from(&input[0..first + 1]);
+        let mut first = BytesMut::from(&input[0..=first]);
         let mut second = Some(BytesMut::from(&input[second..]));
 
         let mut decoder = RespParser::default();
-        let mut res = Vec::new();
+        let mut res: Vec<RedisValue> = Vec::new();
         loop {
             match decoder.decode(&mut first) {
                 Ok(Some(value)) => {
-                    res.push(value);
+                    res.push(value.into());
                     break;
                 }
                 Ok(None) => {
@@ -279,7 +319,7 @@ mod resp_parser_tests {
         loop {
             match decoder.decode(&mut first) {
                 Ok(Some(value)) => {
-                    res.push(value);
+                    res.push(value.into());
                     break;
                 }
                 Err(e) => panic!("Should not error, {:?}", e),
@@ -293,17 +333,18 @@ mod resp_parser_tests {
         b"hello".to_vec()
     }
 
-    #[test]
-    fn test_simple_string() {
-        let t = RedisValue::SimpleString(ezs());
-        let s = "+hello\r\n";
-        generic_test(s, t);
+    // Simple String has been removed.
+    // #[test]
+    // fn test_simple_string() {
+    //     let t = RedisValue::BulkString(ezs());
+    //     let s = "+hello\r\n";
+    //     generic_test(s, t);
 
-        let t0 = RedisValue::SimpleString(ezs());
-        let t1 = RedisValue::SimpleString("abcdefghijklmnopqrstuvwxyz".as_bytes().to_vec());
-        let s = "+hello\r\n+abcdefghijklmnopqrstuvwxyz\r\n";
-        generic_test_arr(s, vec![t0, t1]);
-    }
+    //     let t0 = RedisValue::BulkString(ezs());
+    //     let t1 = RedisValue::BulkString("abcdefghijklmnopqrstuvwxyz".as_bytes().to_vec());
+    //     let s = "+hello\r\n+abcdefghijklmnopqrstuvwxyz\r\n";
+    //     generic_test_arr(s, vec![t0, t1]);
+    // }
 
     #[test]
     fn test_error() {

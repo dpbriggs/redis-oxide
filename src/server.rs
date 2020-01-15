@@ -47,7 +47,7 @@ async fn process(socket: TcpStream, state_store: StateStoreRef, dump_file: DumpF
                 error!(LOGGER, "Error recieving redis value {:?}", e);
                 continue;
             }
-            let res = match translate(&redis_value.unwrap()) {
+            let res = match translate(redis_value.unwrap().into()) {
                 Ok(op) => {
                     debug!(LOGGER, "running op {:?}", op.clone());
                     // Step 1: Execute the operation the operation (from translate above)

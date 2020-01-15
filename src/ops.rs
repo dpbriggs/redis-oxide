@@ -170,20 +170,6 @@ impl TryFrom<&RedisValue> for Count {
     }
 }
 
-// Translate single RedisValue inputs into an Ops
-// Used for commands like PING
-// TODO: Get rid of this
-fn translate_string(start: &[u8]) -> Result<Ops, OpsError> {
-    let start = &String::from_utf8_lossy(start);
-    match start.to_lowercase().as_ref() {
-        "ping" => Ok(Ops::Misc(MiscOps::Pong)),
-        "keys" => Ok(Ops::Misc(MiscOps::Keys)),
-        "flushall" => Ok(Ops::Misc(MiscOps::FlushAll)),
-        "flushdb" => Ok(Ops::Misc(MiscOps::FlushDB)),
-        _ => Err(OpsError::UnknownOp),
-    }
-}
-
 /// Ensure the passed collection has an even number of arguments.
 fn ensure_even<T>(v: &[T]) -> Result<(), OpsError> {
     if v.len() % 2 != 0 {
@@ -319,12 +305,13 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
         return Err(OpsError::Noop);
     }
     let head = Value::try_from(&array[0])?;
-    if let Ok(op) = translate_string(&head) {
-        return Ok(op);
-    }
     let tail: Vec<&RedisValue> = array.iter().skip(1).collect();
     let head = &String::from_utf8_lossy(&head);
     match head.to_lowercase().as_ref() {
+        "ping" => ok!(MiscOps::Pong),
+        "keys" => ok!(MiscOps::Keys),
+        "flushall" => ok!(MiscOps::FlushAll),
+        "flushdb" => ok!(MiscOps::FlushDB),
         // Key-Value
         "set" => {
             let (key, val) = get_key_and_value(array)?;
@@ -717,11 +704,11 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
     }
 }
 
-pub fn translate(rv: &RedisValue) -> Result<Ops, OpsError> {
+pub fn translate(rv: RedisValue) -> Result<Ops, OpsError> {
     match rv {
-        RedisValue::SimpleString(s_string) => translate_string(s_string),
-        RedisValue::BulkString(s_string) => translate_string(s_string),
-        RedisValue::Array(vals) => translate_array(vals),
+        RedisValue::Array(vals) => translate_array(&vals),
+        bs @ RedisValue::SimpleString(_) => translate_array(&[bs]),
+        s @ RedisValue::BulkString(_) => translate_array(&[s]),
         _ => Err(OpsError::UnknownOp),
     }
 }
