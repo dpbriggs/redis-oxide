@@ -12,7 +12,6 @@ use structopt::StructOpt;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 1. Get the args.
     let opt = Config::from_args();
-    println!("memory only: {}", opt.memory_only);
     // 2. Print the fancy logo.
     startup_message(&opt);
     // 3. Get the database file, making folders if necessary.

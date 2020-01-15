@@ -18,14 +18,12 @@ pub async fn key_interact(key_op: KeyOps, state: StateRef) -> ReturnValue {
     match key_op {
         KeyOps::Get(key) => state
             .kv
-            .read()
             .get(&key)
             .map_or(ReturnValue::Nil, |v| ReturnValue::StringRes(v.to_vec())),
         KeyOps::MGet(keys) => {
-            let kv = state.kv.read();
             let vals = keys
                 .iter()
-                .map(|key| match kv.get(key) {
+                .map(|key| match state.kv.get(key) {
                     Some(v) => ReturnValue::StringRes(v.to_vec()),
                     None => ReturnValue::Nil,
                 })
@@ -33,11 +31,11 @@ pub async fn key_interact(key_op: KeyOps, state: StateRef) -> ReturnValue {
             ReturnValue::Array(vals)
         }
         KeyOps::Set(key, value) => {
-            state.kv.write().insert(key, value);
+            state.kv.insert(key, value);
             ReturnValue::Ok
         }
         KeyOps::MSet(key_vals) => {
-            let mut kv = state.kv.write();
+            let kv = &state.kv;
             for (key, val) in key_vals.into_iter() {
                 kv.insert(key, val);
             }
@@ -46,47 +44,42 @@ pub async fn key_interact(key_op: KeyOps, state: StateRef) -> ReturnValue {
         KeyOps::Del(keys) => {
             let deleted = keys
                 .iter()
-                .map(|x| state.kv.write().remove(x))
+                .map(|x| state.kv.remove(x))
                 .filter(Option::is_some)
                 .count();
             ReturnValue::IntRes(deleted as Count)
         }
-        KeyOps::Rename(key, new_key) => {
-            let mut keys = state.kv.write();
-            match keys.remove(&key) {
-                Some(value) => {
-                    keys.insert(new_key, value);
-                    ReturnValue::Ok
-                }
-                None => ReturnValue::Error(b"no such key"),
+        KeyOps::Rename(key, new_key) => match state.kv.remove(&key) {
+            Some((_, value)) => {
+                state.kv.insert(new_key, value);
+                ReturnValue::Ok
             }
-        }
+            None => ReturnValue::Error(b"no such key"),
+        },
         KeyOps::RenameNx(key, new_key) => {
-            let mut keys = state.kv.write();
-            if keys.contains_key(&new_key) {
+            if state.kv.contains_key(&new_key) {
                 return ReturnValue::IntRes(0);
             }
-            match keys.remove(&key) {
-                Some(value) => {
-                    keys.insert(new_key, value);
+            match state.kv.remove(&key) {
+                Some((_, value)) => {
+                    state.kv.insert(new_key, value);
                     ReturnValue::IntRes(1)
                 }
                 None => ReturnValue::Error(b"no such key"),
             }
         }
-        KeyOps::Test(key) => {
-            let value = state
-                .kv
-                .read()
-                .get(&key)
-                .cloned()
-                .unwrap_or_else(|| b"hi".to_vec());
-            info!(
-                LOGGER,
-                "{} = {}",
-                String::from_utf8_lossy(&key),
-                String::from_utf8_lossy(&value)
-            );
+        KeyOps::Test(_key) => {
+            // let value: Value = state
+            //     .kv
+            //     .get(&key)
+            //     .map(|r| r.value().clone())
+            //     .unwrap_or_else(|| b"hi".to_vec());
+            // info!(
+            //     LOGGER,
+            //     "{} = {}",
+            //     String::from_utf8_lossy(&key),
+            //     String::from_utf8_lossy(&value)
+            // );
             ReturnValue::Ok
         }
     }

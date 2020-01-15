@@ -1,3 +1,4 @@
+use dashmap::DashMap;
 use growable_bloom_filter::GrowableBloom;
 /// Common Types in the project.
 use parking_lot::RwLock;
@@ -96,7 +97,7 @@ impl ReturnValue {
 }
 
 /// Canonical type for Key-Value storage.
-type KeyString = HashMap<Key, Value>;
+type KeyString = DashMap<Key, Value>;
 /// Canonical type for Key-Set storage.
 type KeySet = HashMap<Key, HashSet<Value>>;
 /// Canonical type for Key-List storage.
@@ -111,7 +112,7 @@ type KeyStack = HashMap<Key, Stack<Value>>;
 
 /// Top level database struct.
 /// Holds all StateRef dbs, and will hand them out on request.
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct StateStore {
     pub states: Mutex<HashMap<Index, StateRef>>,
     #[serde(skip)]
@@ -130,10 +131,10 @@ pub type StateRef = Arc<State>;
 
 /// The state stored by redis-oxide. These fields are the ones
 /// used by the various datastructure files (keys.rs, etc)
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct State {
     #[serde(default)]
-    pub kv: RwLock<KeyString>,
+    pub kv: KeyString,
     #[serde(default)]
     pub sets: RwLock<KeySet>,
     #[serde(default)]
