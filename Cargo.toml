@@ -13,13 +13,12 @@ name = "redis-oxide"
 path = "src/main.rs"
 
 [dependencies]
-tokio = { version = "0.2.2", features = ["full"] }
+tokio = { version = "0.2.9", features = ["full"] }
 tokio-util = { version = "0.2", features = ["codec"] }
 shlex = "0.1.1"
 promptly = "0.1.5"
 rand = "0.7.2"
 bytes = "0.5.0"
-combine = "3.8.1"
 sloggers = "0.3.4"
 lazy_static = "1.4.0"
 slog = "2.5.2"

@@ -13,9 +13,6 @@ extern crate lazy_static;
 #[macro_use]
 extern crate slog;
 
-#[macro_use]
-extern crate combine;
-
 extern crate rmp_serde as rmps;
 
 pub mod asyncresp;

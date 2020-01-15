@@ -1,4 +1,3 @@
-use crate::logger::LOGGER;
 use crate::op_variants;
 use crate::types::{Count, Key, ReturnValue, StateRef, Value};
 
