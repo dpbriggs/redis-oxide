@@ -9,6 +9,7 @@ use std::sync::Arc;
 use parking_lot::Mutex;
 use std::fs::File;
 
+use crate::data_structures::concurrent_hashmap::ConcurrentHashMap;
 use crate::data_structures::receipt_map::RecieptMap;
 use crate::data_structures::sorted_set::SortedSet;
 use crate::data_structures::stack::Stack;
@@ -60,6 +61,7 @@ pub enum ReturnValue {
     Array(Vec<ReturnValue>),
     IntRes(i64),
     Nil,
+    BadType,
 }
 
 /// Convenience trait to convert Count to ReturnValue.
@@ -146,6 +148,8 @@ pub struct State {
     pub blooms: RwLock<KeyBloom>,
     #[serde(default)]
     pub stacks: RwLock<KeyStack>,
+    #[serde(default)]
+    pub concurrent_kv: ConcurrentHashMap,
     #[serde(skip)]
     pub reciept_map: Mutex<RecieptMap>,
 }
@@ -165,6 +169,7 @@ impl From<ReturnValue> for RedisValue {
             ReturnValue::Array(a) => {
                 RedisValue::Array(a.into_iter().map(RedisValue::from).collect())
             }
+            ReturnValue::BadType => RedisValue::Error("ERR: Bad Type".as_bytes().to_vec()),
         }
     }
 }

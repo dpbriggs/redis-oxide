@@ -15,6 +15,7 @@ impl fmt::Display for ReturnValue {
             ReturnValue::Nil => write!(f, "(nil)"),
             ReturnValue::Error(e) => write!(f, "ERR {:?}", e),
             ReturnValue::Array(a) => write!(f, "{:?}", a),
+            ReturnValue::BadType => write!(f, "ERR: Bad Type"),
         }
     }
 }

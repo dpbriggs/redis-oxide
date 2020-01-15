@@ -13,7 +13,7 @@ name = "redis-oxide"
 path = "src/main.rs"
 
 [dependencies]
-tokio = { version = "0.2.2", features = ["full"] }
+tokio = { version = "0.2.9", features = ["full"] }
 tokio-util = { version = "0.2", features = ["codec"] }
 shlex = "0.1.1"
 promptly = "0.1.5"
@@ -36,6 +36,7 @@ seahash = "3.0.6"
 futures = "0.3.1"
 futures-util = "0.3.1"
 serde_bytes = "0.11.3"
+evmap = { version = "7.1.3", features = ["smallvec"] }
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"

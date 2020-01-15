@@ -2,6 +2,7 @@ use std::convert::TryFrom;
 use std::fmt::Debug;
 
 use crate::bloom::{bloom_interact, BloomOps};
+use crate::concurrent_kv::{conc_key_interact, ConcKeyOps};
 use crate::hashes::{hash_interact, HashOps};
 use crate::keys::{key_interact, KeyOps};
 use crate::lists::{list_interact, ListOps};
@@ -26,6 +27,7 @@ pub enum Ops {
     ZSets(ZSetOps),
     Blooms(BloomOps),
     Stacks(StackOps),
+    ConcKeys(ConcKeyOps),
 }
 
 /// Top level interaction function. Used by the server to run
@@ -39,6 +41,7 @@ pub async fn op_interact(op: Ops, state: StateRef) -> ReturnValue {
         Ops::ZSets(op) => zset_interact(op, state).await,
         Ops::Blooms(op) => bloom_interact(op, state).await,
         Ops::Stacks(op) => stack_interact(op, state).await,
+        Ops::ConcKeys(op) => conc_key_interact(op, state).await,
         _ => unreachable!(),
     }
 }
@@ -311,6 +314,9 @@ macro_rules! ok {
     };
     (BloomOps::$OpName:ident($($OpArg:expr),*)) => {
         Ok(Ops::Blooms(BloomOps::$OpName($( $OpArg ),*)))
+    };
+    (ConcKeyOps::$OpName:ident($($OpArg:expr),*)) => {
+        Ok(Ops::ConcKeys(ConcKeyOps::$OpName($( $OpArg ),*)))
     };
 }
 
@@ -712,6 +718,18 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
             verify_size(&tail, 1)?;
             let key = Key::try_from(tail[0])?;
             ok!(StackOps::STSize(key))
+        }
+        // Concurrent kv
+        "cset" => {
+            verify_size(&tail, 2)?;
+            let key = Key::try_from(tail[0])?;
+            let value = Value::try_from(tail[1])?;
+            ok!(ConcKeyOps::CSet(key, value))
+        }
+        "cget" => {
+            verify_size(&tail, 1)?;
+            let key = Key::try_from(tail[0])?;
+            ok!(ConcKeyOps::CGet(key))
         }
         _ => Err(OpsError::UnknownOp),
     }
