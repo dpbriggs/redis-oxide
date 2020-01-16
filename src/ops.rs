@@ -1,3 +1,4 @@
+use bytes::Bytes;
 use std::convert::TryFrom;
 use std::fmt::Debug;
 
@@ -11,10 +12,7 @@ use crate::sorted_sets::{zset_interact, ZSetOps};
 use crate::stack::{stack_interact, StackOps};
 use crate::types::{ReturnValue, StateRef};
 
-use crate::types::{
-    Count, Index, Key, RedisValue, Score, UTimeout, Value, EMPTY_ARRAY, NULL_ARRAY,
-    NULL_BULK_STRING,
-};
+use crate::types::{Count, Index, Key, RedisValueRef, Score, UTimeout, Value};
 
 #[derive(Debug, Clone)]
 pub enum Ops {
@@ -56,121 +54,129 @@ pub enum OpsError {
     InvalidArgs(String),
 }
 
-impl From<OpsError> for RedisValue {
-    fn from(op: OpsError) -> RedisValue {
+impl From<OpsError> for RedisValueRef {
+    fn from(op: OpsError) -> RedisValueRef {
         match op {
-            OpsError::InvalidStart => RedisValue::Error(b"Invalid start!".to_vec()),
-            OpsError::UnknownOp => RedisValue::Error(b"Unknown Operation!".to_vec()),
+            OpsError::InvalidStart => RedisValueRef::ErrorMsg(b"Invalid start!".to_vec()),
+            OpsError::UnknownOp => RedisValueRef::ErrorMsg(b"Unknown Operation!".to_vec()),
             OpsError::InvalidArgPattern(explain) => {
                 let f = format!("Invalid Arg Pattern, {}", explain);
-                RedisValue::Error(f.as_bytes().to_vec())
+                RedisValueRef::ErrorMsg(f.as_bytes().to_vec())
             }
             OpsError::NotEnoughArgs(req, given) => {
                 let f = format!("Not enough arguments, {} required, {} given!", req, given);
-                RedisValue::Error(f.as_bytes().to_vec())
+                RedisValueRef::ErrorMsg(f.as_bytes().to_vec())
             }
             OpsError::WrongNumberOfArgs(required, given) => {
                 let f = format!(
                     "Wrong number of arguments! ({} required, {} given)",
                     required, given
                 );
-                RedisValue::Error(f.as_bytes().to_vec())
+                RedisValueRef::ErrorMsg(f.as_bytes().to_vec())
             }
-            OpsError::InvalidType => RedisValue::Error(b"Invalid Type!".to_vec()),
-            OpsError::SyntaxError => RedisValue::Error(b"Syntax Error!".to_vec()),
-            OpsError::Noop => RedisValue::Error(b"".to_vec()),
-            OpsError::InvalidArgs(s) => RedisValue::Error(s.as_bytes().to_vec()),
+            OpsError::InvalidType => RedisValueRef::ErrorMsg(b"Invalid Type!".to_vec()),
+            OpsError::SyntaxError => RedisValueRef::ErrorMsg(b"Syntax Error!".to_vec()),
+            OpsError::Noop => RedisValueRef::ErrorMsg(b"".to_vec()),
+            OpsError::InvalidArgs(s) => RedisValueRef::ErrorMsg(s.as_bytes().to_vec()),
         }
     }
 }
 
-impl ToString for RedisValue {
-    fn to_string(&self) -> String {
-        match self {
-            RedisValue::SimpleString(s) => format!("+{}\r\n", String::from_utf8_lossy(s)),
-            RedisValue::Error(e) => format!("-{}\r\n", String::from_utf8_lossy(e)),
-            RedisValue::BulkString(s) => {
-                format!("${}\r\n{}\r\n", s.len(), String::from_utf8_lossy(s))
-            }
-            RedisValue::Int(i) => format!(":{}\r\n", i.to_string()),
-            RedisValue::Array(a) => {
-                if a.is_empty() {
-                    return EMPTY_ARRAY.to_string();
-                }
-                let contents: String = a
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect::<Vec<String>>()
-                    .join("");
-                if contents.ends_with("\r\n") {
-                    return format!("*{:?}\r\n{}", a.len(), contents);
-                }
-                format!("*{:?}\r\n{:?}\r\n", a.len(), contents)
-            }
-            RedisValue::NullBulkString => NULL_BULK_STRING.to_string(),
-            RedisValue::NullArray => NULL_ARRAY.to_string(),
-        }
-    }
-}
+// impl ToString for RedisValueRef {
+//     fn to_string(&self) -> String {
+//         match self {
+//             RedisValueRef::SimpleString(s) => format!("+{}\r\n", String::from_utf8_lossy(s)),
+//             RedisValueRef::Error(e) => format!("-{}\r\n", String::from_utf8_lossy(e)),
+//             RedisValueRef::BulkString(s) => {
+//                 format!("${}\r\n{}\r\n", s.len(), String::from_utf8_lossy(s))
+//             }
+//             RedisValueRef::Int(i) => format!(":{}\r\n", i.to_string()),
+//             RedisValueRef::Array(a) => {
+//                 if a.is_empty() {
+//                     return EMPTY_ARRAY.to_string();
+//                 }
+//                 let contents: String = a
+//                     .iter()
+//                     .map(ToString::to_string)
+//                     .collect::<Vec<String>>()
+//                     .join("");
+//                 if contents.ends_with("\r\n") {
+//                     return format!("*{:?}\r\n{}", a.len(), contents);
+//                 }
+//                 format!("*{:?}\r\n{:?}\r\n", a.len(), contents)
+//             }
+//             RedisValueRef::NullBulkString => NULL_BULK_STRING.to_string(),
+//             RedisValueRef::NullArray => NULL_ARRAY.to_string(),
+//         }
+//     }
+// }
 
-impl TryFrom<RedisValue> for Vec<u8> {
+impl TryFrom<RedisValueRef> for Bytes {
     type Error = OpsError;
 
-    fn try_from(r: RedisValue) -> Result<Value, Self::Error> {
+    fn try_from(r: RedisValueRef) -> Result<Value, Self::Error> {
         match r {
-            RedisValue::SimpleString(s) => Ok(s),
-            RedisValue::BulkString(s) => Ok(s),
+            RedisValueRef::String(s) => Ok(s),
             _ => Err(OpsError::InvalidType),
         }
     }
 }
 
-impl TryFrom<&RedisValue> for Vec<u8> {
+impl TryFrom<&RedisValueRef> for Bytes {
     type Error = OpsError;
 
-    fn try_from(r: &RedisValue) -> Result<Value, Self::Error> {
-        Value::try_from(r.clone())
-    }
-}
-
-impl TryFrom<RedisValue> for String {
-    type Error = OpsError;
-
-    fn try_from(r: RedisValue) -> Result<String, Self::Error> {
+    fn try_from(r: &RedisValueRef) -> Result<Value, Self::Error> {
+        // SAFETY: We can only be here if we're processing an op,
+        // and therefore there's a live reference count at this point.
+        // If there's issues, use this instead: Value::try_from(r.clone())
         match r {
-            RedisValue::SimpleString(s) => Ok(String::from_utf8_lossy(&s).to_string()),
-            RedisValue::BulkString(s) => Ok(String::from_utf8_lossy(&s).to_string()),
+            RedisValueRef::String(s) => unsafe {
+                let len = s.len();
+                let buf: &'static [u8] = std::slice::from_raw_parts(s.as_ptr(), len);
+                Ok(Value::from_static(buf))
+            },
             _ => Err(OpsError::InvalidType),
         }
     }
 }
 
-impl TryFrom<&RedisValue> for String {
+impl TryFrom<RedisValueRef> for String {
     type Error = OpsError;
 
-    fn try_from(r: &RedisValue) -> Result<String, Self::Error> {
+    fn try_from(r: RedisValueRef) -> Result<String, Self::Error> {
+        match r {
+            RedisValueRef::String(s) => Ok(String::from_utf8_lossy(&s).to_string()),
+            _ => Err(OpsError::InvalidType),
+        }
+    }
+}
+
+impl TryFrom<&RedisValueRef> for String {
+    type Error = OpsError;
+
+    fn try_from(r: &RedisValueRef) -> Result<String, Self::Error> {
         String::try_from(r.clone())
     }
 }
 
-impl TryFrom<&RedisValue> for Count {
+impl TryFrom<&RedisValueRef> for Count {
     type Error = OpsError;
 
-    fn try_from(r: &RedisValue) -> Result<Count, Self::Error> {
+    fn try_from(r: &RedisValueRef) -> Result<Count, Self::Error> {
         match r {
-            RedisValue::Int(e) => Ok(*e as Count),
-            RedisValue::BulkString(s) | RedisValue::SimpleString(s) => {
-                match String::from_utf8(s.to_owned()) {
-                    Ok(s) => s.parse().map_err(|_| OpsError::InvalidType),
-                    Err(_) => Err(OpsError::InvalidType),
-                }
-            }
+            RedisValueRef::Int(e) => Ok(*e as Count),
+            // TODO: Not copy here
+            RedisValueRef::String(s) => match String::from_utf8(s.to_owned().to_vec()) {
+                Ok(s) => s.parse().map_err(|_| OpsError::InvalidType),
+                Err(_) => Err(OpsError::InvalidType),
+            },
             _ => Err(OpsError::InvalidType),
         }
     }
 }
 
 /// Ensure the passed collection has an even number of arguments.
+#[inline]
 fn ensure_even<T>(v: &[T]) -> Result<(), OpsError> {
     if v.len() % 2 != 0 {
         return Err(OpsError::InvalidArgPattern(
@@ -180,9 +186,9 @@ fn ensure_even<T>(v: &[T]) -> Result<(), OpsError> {
     Ok(())
 }
 
-fn values_from_tail<'a, ValueType>(tail: &[&'a RedisValue]) -> Result<Vec<ValueType>, OpsError>
+fn values_from_tail<'a, ValueType>(tail: &[&'a RedisValueRef]) -> Result<Vec<ValueType>, OpsError>
 where
-    ValueType: TryFrom<&'a RedisValue, Error = OpsError>,
+    ValueType: TryFrom<&'a RedisValueRef, Error = OpsError>,
 {
     let mut items: Vec<ValueType> = Vec::new();
     for item in tail.iter() {
@@ -213,11 +219,11 @@ fn verify_size<T>(v: &[T], size: usize) -> Result<(), OpsError> {
 /// Get a tuple of (KeyType, ValueType)
 /// Mainly used for the thousand 2-adic ops
 fn get_key_and_value<'a, KeyType, ValueType>(
-    array: &'a [RedisValue],
+    array: &'a [RedisValueRef],
 ) -> Result<(KeyType, ValueType), OpsError>
 where
-    KeyType: TryFrom<&'a RedisValue, Error = OpsError>,
-    ValueType: TryFrom<&'a RedisValue, Error = OpsError>,
+    KeyType: TryFrom<&'a RedisValueRef, Error = OpsError>,
+    ValueType: TryFrom<&'a RedisValueRef, Error = OpsError>,
 {
     if array.len() < 3 {
         return Err(OpsError::WrongNumberOfArgs(2, array.len() - 1));
@@ -227,14 +233,14 @@ where
     Ok((key, val))
 }
 
-/// Transform &[RedisValue] into (KeyType, Vec<TailType>)
+/// Transform &[RedisValueRef] into (KeyType, Vec<TailType>)
 /// Used for commands like DEL arg1 arg2...
 fn get_key_and_tail<'a, KeyType, TailType>(
-    array: &'a [RedisValue],
+    array: &'a [RedisValueRef],
 ) -> Result<(KeyType, Vec<TailType>), OpsError>
 where
-    KeyType: TryFrom<&'a RedisValue, Error = OpsError>,
-    TailType: TryFrom<&'a RedisValue, Error = OpsError>,
+    KeyType: TryFrom<&'a RedisValueRef, Error = OpsError>,
+    TailType: TryFrom<&'a RedisValueRef, Error = OpsError>,
 {
     if array.len() < 3 {
         return Err(OpsError::WrongNumberOfArgs(3, array.len()));
@@ -250,11 +256,11 @@ where
 
 /// Transform a sequence of [Key1, Val1, Key2, Val2, ...] -> Vec<(Key, Value)>
 fn get_key_value_pairs<'a, KeyType, ValueType>(
-    tail: &[&'a RedisValue],
+    tail: &[&'a RedisValueRef],
 ) -> Result<Vec<(KeyType, ValueType)>, OpsError>
 where
-    KeyType: TryFrom<&'a RedisValue, Error = OpsError> + Debug,
-    ValueType: TryFrom<&'a RedisValue, Error = OpsError> + Debug,
+    KeyType: TryFrom<&'a RedisValueRef, Error = OpsError> + Debug,
+    ValueType: TryFrom<&'a RedisValueRef, Error = OpsError> + Debug,
 {
     ensure_even(tail)?;
     let keys = tail.iter().step_by(2);
@@ -300,12 +306,12 @@ macro_rules! ok {
     };
 }
 
-fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
+fn translate_array(array: &[RedisValueRef]) -> Result<Ops, OpsError> {
     if array.is_empty() {
         return Err(OpsError::Noop);
     }
     let head = Value::try_from(&array[0])?;
-    let tail: Vec<&RedisValue> = array.iter().skip(1).collect();
+    let tail: Vec<&RedisValueRef> = array.iter().skip(1).collect();
     let head = &String::from_utf8_lossy(&head);
     match head.to_lowercase().as_ref() {
         "ping" => ok!(MiscOps::Pong),
@@ -704,11 +710,10 @@ fn translate_array(array: &[RedisValue]) -> Result<Ops, OpsError> {
     }
 }
 
-pub fn translate(rv: RedisValue) -> Result<Ops, OpsError> {
+pub fn translate(rv: RedisValueRef) -> Result<Ops, OpsError> {
     match rv {
-        RedisValue::Array(vals) => translate_array(&vals),
-        bs @ RedisValue::SimpleString(_) => translate_array(&[bs]),
-        s @ RedisValue::BulkString(_) => translate_array(&[s]),
+        RedisValueRef::Array(vals) => translate_array(&vals),
+        bs @ RedisValueRef::String(_) => translate_array(&[bs]),
         _ => Err(OpsError::UnknownOp),
     }
 }

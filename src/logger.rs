@@ -8,7 +8,7 @@ use sloggers::Build;
 #[cfg(debug_assertions)]
 fn get_logger() -> Logger {
     let mut builder = TerminalLoggerBuilder::new();
-    builder.level(Severity::Info);
+    builder.level(Severity::Debug);
     builder.destination(Destination::Stdout);
 
     builder.build().unwrap()

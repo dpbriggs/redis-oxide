@@ -19,7 +19,7 @@ macro_rules! create_commands_list {
         {
             let mut res = Vec::new();
             $(
-                let tmp = $ops.iter().cloned().map(|s| s.into_bytes()).collect();
+                let tmp = $ops.iter().cloned().map(|s| s.into()).collect();
                 res.push(ReturnValue::MultiStringRes(tmp));
             )*
             ReturnValue::Array(res)
@@ -54,7 +54,7 @@ pub async fn misc_interact(
     state_store: StateStoreRef,
 ) -> ReturnValue {
     match misc_op {
-        MiscOps::Pong => ReturnValue::StringRes(b"PONG".to_vec()),
+        MiscOps::Pong => ReturnValue::StringRes(Value::from_static(b"PONG")),
         MiscOps::FlushAll => {
             let clear = |state: &StateRef| {
                 state.kv.clear();
@@ -107,7 +107,7 @@ pub async fn misc_interact(
                 "arch_bits:64",
             ]
             .join("\r\n");
-            ReturnValue::StringRes(info.into_bytes())
+            ReturnValue::StringRes(info.into())
         }
     }
 }

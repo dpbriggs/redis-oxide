@@ -96,7 +96,8 @@ pub async fn hash_interact(hash_op: HashOps, state: StateRef) -> ReturnValue {
                 None => 0,
             };
             curr_value += count;
-            hash.insert(field, curr_value.to_string().as_bytes().to_vec());
+            let new_value = Value::from(curr_value.to_string());
+            hash.insert(field, new_value);
             ReturnValue::Ok
         }
         HashOps::HLen(key) => read_hashes!(state, &key)

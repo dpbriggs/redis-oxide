@@ -3,7 +3,7 @@ use std::convert::From;
 use std::io;
 use std::str;
 
-use crate::types::{RedisValue, RedisValueRef, NULL_ARRAY, NULL_BULK_STRING};
+use crate::types::{RedisValueRef, NULL_ARRAY, NULL_BULK_STRING};
 
 use bytes::BytesMut;
 use tokio_util::codec::{Decoder, Encoder};
@@ -38,12 +38,12 @@ enum RedisBufSplit {
 }
 
 impl RedisBufSplit {
-    fn to_redis_value(self, buf: &Bytes) -> RedisValueRef {
+    fn redis_value(self, buf: &Bytes) -> RedisValueRef {
         match self {
-            RedisBufSplit::String(bfs) => RedisValueRef::String(bfs.view_bytes(&buf)),
-            RedisBufSplit::Error(bfs) => RedisValueRef::Error(bfs.view_bytes(&buf)),
+            RedisBufSplit::String(bfs) => RedisValueRef::String(bfs.view_bytes(buf)),
+            RedisBufSplit::Error(bfs) => RedisValueRef::Error(bfs.view_bytes(buf)),
             RedisBufSplit::Array(arr) => {
-                RedisValueRef::Array(arr.into_iter().map(|bfs| bfs.to_redis_value(buf)).collect())
+                RedisValueRef::Array(arr.into_iter().map(|bfs| bfs.redis_value(buf)).collect())
             }
             RedisBufSplit::NullArray => RedisValueRef::NullArray,
             RedisBufSplit::NullBulkString => RedisValueRef::NullBulkString,
@@ -83,14 +83,13 @@ fn word(buf: &mut BytesMut, pos: usize) -> Option<(usize, BufSplit)> {
     }
 }
 
-fn int(mut buf: &mut BytesMut, pos: usize) -> Result<Option<(usize, i64)>, RESPError> {
+fn int(buf: &mut BytesMut, pos: usize) -> Result<Option<(usize, i64)>, RESPError> {
     if buf.len() <= pos {
         return Ok(None);
     }
     match word(buf, pos) {
         Some((pos, word)) => {
-            let s = str::from_utf8(word.copy_bytes(&mut buf))
-                .map_err(|_| RESPError::IntParseFailure)?;
+            let s = str::from_utf8(word.copy_bytes(buf)).map_err(|_| RESPError::IntParseFailure)?;
             let i = s.parse().map_err(|_| RESPError::IntParseFailure)?;
             Ok(Some((pos, i)))
         }
@@ -196,7 +195,7 @@ impl Decoder for RespParser {
         match parse(buf, 0)? {
             Some((pos, value)) => {
                 let our_data = buf.split_to(pos);
-                Ok(Some(value.to_redis_value(&our_data.freeze())))
+                Ok(Some(value.redis_value(&our_data.freeze())))
             }
             None => Ok(None),
         }
@@ -204,7 +203,7 @@ impl Decoder for RespParser {
 }
 
 impl Encoder for RespParser {
-    type Item = RedisValue;
+    type Item = RedisValueRef;
     type Error = io::Error;
 
     fn encode(&mut self, item: Self::Item, dst: &mut BytesMut) -> io::Result<()> {
@@ -213,26 +212,26 @@ impl Encoder for RespParser {
     }
 }
 
-fn write_redis_value(item: RedisValue, dst: &mut BytesMut) {
+fn write_redis_value(item: RedisValueRef, dst: &mut BytesMut) {
     match item {
-        RedisValue::Error(e) => {
+        RedisValueRef::Error(e) => {
             dst.extend_from_slice(b"-");
             dst.extend_from_slice(&e);
             dst.extend_from_slice(b"\r\n");
         }
-        RedisValue::SimpleString(s) => {
-            dst.extend_from_slice(b"+");
-            dst.extend_from_slice(&s);
+        RedisValueRef::ErrorMsg(e) => {
+            dst.extend_from_slice(b"-");
+            dst.extend_from_slice(&e);
             dst.extend_from_slice(b"\r\n");
         }
-        RedisValue::BulkString(s) => {
+        RedisValueRef::String(s) => {
             dst.extend_from_slice(b"$");
             dst.extend_from_slice(s.len().to_string().as_bytes());
             dst.extend_from_slice(b"\r\n");
             dst.extend_from_slice(&s);
             dst.extend_from_slice(b"\r\n");
         }
-        RedisValue::Array(array) => {
+        RedisValueRef::Array(array) => {
             dst.extend_from_slice(b"*");
             dst.extend_from_slice(array.len().to_string().as_bytes());
             dst.extend_from_slice(b"\r\n");
@@ -240,20 +239,20 @@ fn write_redis_value(item: RedisValue, dst: &mut BytesMut) {
                 write_redis_value(redis_value, dst);
             }
         }
-        RedisValue::Int(i) => {
+        RedisValueRef::Int(i) => {
             dst.extend_from_slice(b":");
             dst.extend_from_slice(i.to_string().as_bytes());
             dst.extend_from_slice(b"\r\n");
         }
-        RedisValue::NullArray => dst.extend_from_slice(NULL_ARRAY.as_bytes()),
-        RedisValue::NullBulkString => dst.extend_from_slice(NULL_BULK_STRING.as_bytes()),
+        RedisValueRef::NullArray => dst.extend_from_slice(NULL_ARRAY.as_bytes()),
+        RedisValueRef::NullBulkString => dst.extend_from_slice(NULL_BULK_STRING.as_bytes()),
     }
 }
 
 #[cfg(test)]
 mod resp_parser_tests {
     use crate::asyncresp::RespParser;
-    use crate::types::{RedisValue, RedisValueRef, Value};
+    use crate::types::{RedisValueRef, Value};
     use bytes::BytesMut;
     use tokio_util::codec::{Decoder, Encoder};
 
@@ -333,7 +332,7 @@ mod resp_parser_tests {
         b"hello".to_vec()
     }
 
-    // Simple String has been removed.
+    // XXX: Simple String has been removed.
     // #[test]
     // fn test_simple_string() {
     //     let t = RedisValue::BulkString(ezs());

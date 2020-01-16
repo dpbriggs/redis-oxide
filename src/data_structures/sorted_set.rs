@@ -118,6 +118,10 @@ impl SortedSet {
             .sum()
     }
 
+    fn remove_one(&mut self, key: &Key) {
+        self.members_hash.remove(key);
+    }
+
     /// Returns the number of members stored in the set.
     pub fn card(&self) -> Count {
         self.members_hash.len() as Count
@@ -145,8 +149,9 @@ impl SortedSet {
     pub fn pop_max(&mut self, count: Option<Count>) -> Vec<SortedSetMember> {
         let count = count.unwrap_or(1) as usize;
         let ret: Vec<SortedSetMember> = self.scores.iter().rev().take(count).cloned().collect();
-        let keys_to_remove: Vec<Key> = ret.iter().map(|s| s.member.as_bytes().to_vec()).collect();
-        self.remove(&keys_to_remove);
+        for key in ret.iter().map(|s| s.member.clone()) {
+            self.remove_one(&key.as_bytes().to_vec().into());
+        }
         ret
     }
 
@@ -154,8 +159,11 @@ impl SortedSet {
     pub fn pop_min(&mut self, count: Option<Count>) -> Vec<SortedSetMember> {
         let count = count.unwrap_or(1) as usize;
         let ret: Vec<SortedSetMember> = self.scores.iter().take(count).cloned().collect();
-        let keys_to_remove: Vec<Key> = ret.iter().map(|s| s.member.as_bytes().to_vec()).collect();
-        self.remove(&keys_to_remove);
+        for key in ret.iter().map(|s| s.member.clone()) {
+            self.remove_one(&key.as_bytes().to_vec().into());
+        }
+        // let keys_to_remove: Vec<Key> = ret.iter().map(|s| s.member.as_bytes().clone()).collect();
+        // self.remove(&keys_to_remove);
         ret
     }
 

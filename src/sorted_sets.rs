@@ -59,7 +59,7 @@ pub async fn zset_interact(zset_op: ZSetOps, state: StateRef) -> ReturnValue {
                     .into_iter()
                     .fold(Vec::new(), |mut acc, zset_mem| {
                         acc.push(ReturnValue::IntRes(zset_mem.score));
-                        acc.push(ReturnValue::StringRes(zset_mem.member.into_bytes()));
+                        acc.push(ReturnValue::StringRes(zset_mem.member.into()));
                         acc
                     })
             })
@@ -71,7 +71,7 @@ pub async fn zset_interact(zset_op: ZSetOps, state: StateRef) -> ReturnValue {
                     .into_iter()
                     .fold(Vec::new(), |mut acc, zset_mem| {
                         acc.push(ReturnValue::IntRes(zset_mem.score));
-                        acc.push(ReturnValue::StringRes(zset_mem.member.into_bytes()));
+                        acc.push(ReturnValue::StringRes(zset_mem.member.into()));
                         acc
                     })
             })

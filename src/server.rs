@@ -7,7 +7,7 @@ use crate::ops::{op_interact, Ops};
 use crate::{
     ops::translate,
     startup::Config,
-    types::{DumpFile, RedisValue, ReturnValue, StateStoreRef},
+    types::{DumpFile, RedisValueRef, ReturnValue, StateStoreRef},
 };
 use futures::StreamExt;
 use futures_util::sink::SinkExt;
@@ -47,7 +47,7 @@ async fn process(socket: TcpStream, state_store: StateStoreRef, dump_file: DumpF
                 error!(LOGGER, "Error recieving redis value {:?}", e);
                 continue;
             }
-            let res = match translate(redis_value.unwrap().into()) {
+            let res = match translate(redis_value.unwrap()) {
                 Ok(op) => {
                     debug!(LOGGER, "running op {:?}", op.clone());
                     // Step 1: Execute the operation the operation (from translate above)
@@ -62,7 +62,7 @@ async fn process(socket: TcpStream, state_store: StateStoreRef, dump_file: DumpF
                     // Step 3: Finally Return
                     res.into()
                 }
-                Err(e) => RedisValue::from(e),
+                Err(e) => RedisValueRef::from(e),
             };
             if let Err(e) = transport.send(res).await {
                 error!(LOGGER, "Failed to send data to client! {:?}", e)

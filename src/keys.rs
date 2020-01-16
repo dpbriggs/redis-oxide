@@ -15,15 +15,14 @@ op_variants! {
 
 pub async fn key_interact(key_op: KeyOps, state: StateRef) -> ReturnValue {
     match key_op {
-        KeyOps::Get(key) => state
-            .kv
-            .get(&key)
-            .map_or(ReturnValue::Nil, |v| ReturnValue::StringRes(v.to_vec())),
+        KeyOps::Get(key) => state.kv.get(&key).map_or(ReturnValue::Nil, |v| {
+            ReturnValue::StringRes(v.value().clone())
+        }),
         KeyOps::MGet(keys) => {
             let vals = keys
                 .iter()
                 .map(|key| match state.kv.get(key) {
-                    Some(v) => ReturnValue::StringRes(v.to_vec()),
+                    Some(v) => ReturnValue::StringRes(v.value().clone()),
                     None => ReturnValue::Nil,
                 })
                 .collect();
