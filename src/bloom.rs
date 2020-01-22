@@ -34,11 +34,12 @@ pub async fn bloom_interact(bloom_op: BloomOps, state: StateRef) -> ReturnValue 
 mod test_bloom {
     use crate::bloom::{bloom_interact, BloomOps};
     use crate::types::{ReturnValue, State};
+    use bytes::Bytes;
     use std::sync::Arc;
 
     #[tokio::test]
     async fn test_insert() {
-        let (key, v) = (b"key".to_vec(), b"v".to_vec());
+        let (key, v) = (Bytes::from_static(b"key"), Bytes::from_static(b"v"));
         let eng = Arc::new(State::default());
         let res = bloom_interact(BloomOps::BInsert(key, v), eng.clone()).await;
         assert_eq!(res, ReturnValue::Ok);
@@ -46,7 +47,7 @@ mod test_bloom {
 
     #[tokio::test]
     async fn test_contains() {
-        let (key, v) = (b"key".to_vec(), b"v".to_vec());
+        let (key, v) = (Bytes::from_static(b"key"), Bytes::from_static(b"v"));
         let eng = Arc::new(State::default());
         let res = bloom_interact(BloomOps::BContains(key.clone(), v.clone()), eng.clone()).await;
         assert_eq!(res, ReturnValue::IntRes(0));

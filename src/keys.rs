@@ -87,11 +87,12 @@ pub async fn key_interact(key_op: KeyOps, state: StateRef) -> ReturnValue {
 mod test_keys {
     use crate::keys::{key_interact, KeyOps};
     use crate::types::{ReturnValue, State};
+    use bytes::Bytes;
     use std::sync::Arc;
 
     #[tokio::test]
     async fn test_get() {
-        let v = b"hello".to_vec();
+        let v = Bytes::from_static(b"hello");
         let eng = Arc::new(State::default());
         assert_eq!(
             ReturnValue::Nil,
@@ -106,7 +107,7 @@ mod test_keys {
 
     #[tokio::test]
     async fn test_set() {
-        let (l, r) = (b"l".to_vec(), b"r".to_vec());
+        let (l, r) = (Bytes::from_static(b"l"), Bytes::from_static(b"r"));
         let eng = Arc::new(State::default());
         key_interact(KeyOps::Set(l.clone(), r.clone()), eng.clone()).await;
         assert_eq!(
@@ -117,7 +118,7 @@ mod test_keys {
 
     #[tokio::test]
     async fn test_del() {
-        let (l, unused) = (b"l".to_vec(), b"unused".to_vec());
+        let (l, unused) = (Bytes::from_static(b"l"), Bytes::from_static(b"r"));
         let eng = Arc::new(State::default());
         key_interact(KeyOps::Set(l.clone(), l.clone()), eng.clone()).await;
 
@@ -133,7 +134,11 @@ mod test_keys {
 
     #[tokio::test]
     async fn test_rename() {
-        let (old, v, new) = (b"old".to_vec(), b"v".to_vec(), b"new".to_vec());
+        let (old, v, new) = (
+            Bytes::from_static(b"old"),
+            Bytes::from_static(b"v"),
+            Bytes::from_static(b"new"),
+        );
         let eng = Arc::new(State::default());
         key_interact(KeyOps::Set(old.clone(), v.clone()), eng.clone()).await;
         // TODO: Make testing Exec_OpionRes tractable
