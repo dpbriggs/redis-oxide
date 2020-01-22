@@ -150,7 +150,7 @@ impl SortedSet {
         let count = count.unwrap_or(1) as usize;
         let ret: Vec<SortedSetMember> = self.scores.iter().rev().take(count).cloned().collect();
         for key in ret.iter().map(|s| s.member.clone()) {
-            self.remove_one(&key.as_bytes().to_vec().into());
+            self.remove(&[key.into()]);
         }
         ret
     }
@@ -160,10 +160,8 @@ impl SortedSet {
         let count = count.unwrap_or(1) as usize;
         let ret: Vec<SortedSetMember> = self.scores.iter().take(count).cloned().collect();
         for key in ret.iter().map(|s| s.member.clone()) {
-            self.remove_one(&key.as_bytes().to_vec().into());
+            self.remove(&[key.into()]);
         }
-        // let keys_to_remove: Vec<Key> = ret.iter().map(|s| s.member.as_bytes().clone()).collect();
-        // self.remove(&keys_to_remove);
         ret
     }
 
@@ -255,30 +253,29 @@ mod test_sorted_sets_ds {
     }
 
     // XXX: Fix test case. Am moving to proper skiplist later.
-    // #[test]
-    // fn test_pop_max() {
-    //     let mut ss = SortedSet::new();
-    //     assert_eq!(ss.pop_max(None), Vec::new());
-    //     assert_eq!(ss.pop_max(Some(10)), Vec::new());
-    //     ss.add(get_multiple_entries());
-    //     let entries = get_multiple_sorted_set_entries();
-    //     dbg!(&entries);
-    //     assert_eq!(ss.pop_max(None), vec![entries.last().unwrap().clone()]);
-    //     let first_two: Vec<SortedSetMember> = vec![entries[2].clone(), entries[1].clone()];
-    //     dbg!(&first_two);
-    //     assert_eq!(ss.pop_max(Some(2)), first_two);
-    //     assert_eq!(ss.pop_max(Some(2)), Vec::new());
-    // }
-    // #[test]
-    // fn test_pop_min() {
-    //     let mut ss = SortedSet::new();
-    //     assert_eq!(ss.pop_min(None), Vec::new());
-    //     assert_eq!(ss.pop_min(Some(10)), Vec::new());
-    //     ss.add(get_multiple_entries());
-    //     let entries = get_multiple_sorted_set_entries();
-    //     assert_eq!(ss.pop_min(None), vec![entries.first().unwrap().clone()]);
-    //     let last_two: Vec<SortedSetMember> = entries.iter().skip(1).cloned().collect();
-    //     assert_eq!(ss.pop_min(Some(2)), last_two);
-    //     assert_eq!(ss.pop_min(Some(2)), Vec::new());
-    // }
+    #[test]
+    fn test_pop_max() {
+        let mut ss = SortedSet::new();
+        assert_eq!(ss.pop_max(None), Vec::new());
+        assert_eq!(ss.pop_max(Some(10)), Vec::new());
+        ss.add(get_multiple_entries());
+        let entries = get_multiple_sorted_set_entries();
+        dbg!(&entries);
+        assert_eq!(ss.pop_max(None), vec![entries.last().unwrap().clone()]);
+        let first_two: Vec<SortedSetMember> = entries.iter().rev().skip(1).cloned().collect();
+        assert_eq!(ss.pop_max(Some(2)), first_two);
+        assert_eq!(ss.pop_max(Some(2)), Vec::new());
+    }
+    #[test]
+    fn test_pop_min() {
+        let mut ss = SortedSet::new();
+        assert_eq!(ss.pop_min(None), Vec::new());
+        assert_eq!(ss.pop_min(Some(10)), Vec::new());
+        ss.add(get_multiple_entries());
+        let entries = get_multiple_sorted_set_entries();
+        assert_eq!(ss.pop_min(None), vec![entries.first().unwrap().clone()]);
+        let last_two: Vec<SortedSetMember> = entries.iter().skip(1).cloned().collect();
+        assert_eq!(ss.pop_min(Some(2)), last_two);
+        assert_eq!(ss.pop_min(Some(2)), Vec::new());
+    }
 }
