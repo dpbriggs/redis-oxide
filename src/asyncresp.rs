@@ -1,4 +1,5 @@
 use bytes::Bytes;
+use memchr::memchr;
 use std::convert::From;
 use std::io;
 use std::str;
@@ -40,8 +41,8 @@ enum RedisBufSplit {
 impl RedisBufSplit {
     fn redis_value(self, buf: &Bytes) -> RedisValueRef {
         match self {
-            RedisBufSplit::String(bfs) => RedisValueRef::String(bfs.view_bytes(buf)),
-            RedisBufSplit::Error(bfs) => RedisValueRef::Error(bfs.view_bytes(buf)),
+            RedisBufSplit::String(bfs) => RedisValueRef::String(bfs.as_bytes(buf)),
+            RedisBufSplit::Error(bfs) => RedisValueRef::Error(bfs.as_bytes(buf)),
             RedisBufSplit::Array(arr) => {
                 RedisValueRef::Array(arr.into_iter().map(|bfs| bfs.redis_value(buf)).collect())
             }
@@ -52,16 +53,26 @@ impl RedisBufSplit {
     }
 }
 
+/// Fundamental struct for viewing byte slices
+///
+/// Used for zero-copy redis values.
 struct BufSplit(usize, usize);
 
 impl BufSplit {
+    /// Get a lifetime appropriate slice of the underlying buffer.
+    ///
+    /// Constant time.
     #[inline]
-    fn copy_bytes<'a>(&self, buf: &'a BytesMut) -> &'a [u8] {
+    fn as_slice<'a>(&self, buf: &'a BytesMut) -> &'a [u8] {
         &buf[self.0..self.1]
     }
 
+    /// Get a Bytes object representing the appropriate slice
+    /// of bytes.
+    ///
+    /// Constant time.
     #[inline]
-    fn view_bytes(&self, buf: &Bytes) -> Bytes {
+    fn as_bytes(&self, buf: &Bytes) -> Bytes {
         buf.slice(self.0..self.1)
     }
 }
@@ -71,16 +82,13 @@ fn word(buf: &mut BytesMut, pos: usize) -> Option<(usize, BufSplit)> {
     if buf.len() <= pos {
         return None;
     }
-    match buf[pos..].iter().position(|b| *b == b'\r') {
-        Some(end) => {
-            if end + 1 < buf.len() {
-                Some((pos + end + 2, BufSplit(pos, pos + end)))
-            } else {
-                None
-            }
+    memchr(b'\r', &buf[pos..]).and_then(|end| {
+        if end + 1 < buf.len() {
+            Some((pos + end + 2, BufSplit(pos, pos + end)))
+        } else {
+            None
         }
-        _ => None,
-    }
+    })
 }
 
 fn int(buf: &mut BytesMut, pos: usize) -> Result<Option<(usize, i64)>, RESPError> {
@@ -89,7 +97,7 @@ fn int(buf: &mut BytesMut, pos: usize) -> Result<Option<(usize, i64)>, RESPError
     }
     match word(buf, pos) {
         Some((pos, word)) => {
-            let s = str::from_utf8(word.copy_bytes(buf)).map_err(|_| RESPError::IntParseFailure)?;
+            let s = str::from_utf8(word.as_slice(buf)).map_err(|_| RESPError::IntParseFailure)?;
             let i = s.parse().map_err(|_| RESPError::IntParseFailure)?;
             Ok(Some((pos, i)))
         }
