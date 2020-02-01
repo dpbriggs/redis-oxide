@@ -1,5 +1,5 @@
 /// Server launch file. Starts the services to make redis-oxide work.
-use crate::asyncresp::RedisValueCodec;
+use crate::asyncresp::RespParser;
 use crate::database::save_state;
 use crate::logger::LOGGER;
 use crate::misc::misc_interact;
@@ -7,7 +7,7 @@ use crate::ops::{op_interact, Ops};
 use crate::{
     ops::translate,
     startup::Config,
-    types::{DumpFile, RedisValue, ReturnValue, StateStoreRef},
+    types::{DumpFile, RedisValueRef, ReturnValue, StateStoreRef},
 };
 use futures::StreamExt;
 use futures_util::sink::SinkExt;
@@ -41,13 +41,13 @@ fn incr_and_save_if_required(state: StateStoreRef, dump_file: DumpFile) {
 async fn process(socket: TcpStream, state_store: StateStoreRef, dump_file: DumpFile) {
     tokio::spawn(async move {
         let mut state = state_store.get_default();
-        let mut transport = RedisValueCodec::default().framed(socket);
+        let mut transport = RespParser::default().framed(socket);
         while let Some(redis_value) = transport.next().await {
             if let Err(e) = redis_value {
                 error!(LOGGER, "Error recieving redis value {:?}", e);
                 continue;
             }
-            let res = match translate(&redis_value.unwrap()) {
+            let res = match translate(redis_value.unwrap()) {
                 Ok(op) => {
                     debug!(LOGGER, "running op {:?}", op.clone());
                     // Step 1: Execute the operation the operation (from translate above)
@@ -62,7 +62,7 @@ async fn process(socket: TcpStream, state_store: StateStoreRef, dump_file: DumpF
                     // Step 3: Finally Return
                     res.into()
                 }
-                Err(e) => RedisValue::from(e),
+                Err(e) => RedisValueRef::from(e),
             };
             if let Err(e) = transport.send(res).await {
                 error!(LOGGER, "Failed to send data to client! {:?}", e)

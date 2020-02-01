@@ -86,7 +86,7 @@ pub async fn list_interact(list_op: ListOps, state: StateRef) -> ReturnValue {
                     return ReturnValue::Error(b"Bad Range!");
                 }
                 let real_index = real_index as usize;
-                ReturnValue::StringRes(list[real_index].to_vec())
+                ReturnValue::StringRes(list[real_index].clone())
             }
             None => ReturnValue::Nil,
         },

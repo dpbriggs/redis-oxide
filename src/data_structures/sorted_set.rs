@@ -118,6 +118,10 @@ impl SortedSet {
             .sum()
     }
 
+    fn remove_one(&mut self, key: &Key) {
+        self.members_hash.remove(key);
+    }
+
     /// Returns the number of members stored in the set.
     pub fn card(&self) -> Count {
         self.members_hash.len() as Count
@@ -145,8 +149,9 @@ impl SortedSet {
     pub fn pop_max(&mut self, count: Option<Count>) -> Vec<SortedSetMember> {
         let count = count.unwrap_or(1) as usize;
         let ret: Vec<SortedSetMember> = self.scores.iter().rev().take(count).cloned().collect();
-        let keys_to_remove: Vec<Key> = ret.iter().map(|s| s.member.as_bytes().to_vec()).collect();
-        self.remove(&keys_to_remove);
+        for key in ret.iter().map(|s| s.member.clone()) {
+            self.remove(&[key.into()]);
+        }
         ret
     }
 
@@ -154,8 +159,9 @@ impl SortedSet {
     pub fn pop_min(&mut self, count: Option<Count>) -> Vec<SortedSetMember> {
         let count = count.unwrap_or(1) as usize;
         let ret: Vec<SortedSetMember> = self.scores.iter().take(count).cloned().collect();
-        let keys_to_remove: Vec<Key> = ret.iter().map(|s| s.member.as_bytes().to_vec()).collect();
-        self.remove(&keys_to_remove);
+        for key in ret.iter().map(|s| s.member.clone()) {
+            self.remove(&[key.into()]);
+        }
         ret
     }
 
@@ -177,15 +183,17 @@ impl SortedSet {
 mod test_sorted_sets_ds {
     use crate::data_structures::sorted_set::{SortedSet, SortedSetMember};
     use crate::types::{Key, Score};
+    use bytes::Bytes;
 
     fn get_multiple_entries() -> Vec<(Score, Key)> {
         vec![
-            (1, b"hi_0".to_vec()),
-            (3, b"hi_1".to_vec()),
-            (5, b"hi_2".to_vec()),
+            (1, Bytes::from_static(b"hi_0")),
+            (3, Bytes::from_static(b"hi_1")),
+            (5, Bytes::from_static(b"hi_2")),
         ]
     }
 
+    #[allow(unused)]
     fn get_multiple_sorted_set_entries() -> Vec<SortedSetMember> {
         get_multiple_entries()
             .into_iter()
@@ -196,7 +204,7 @@ mod test_sorted_sets_ds {
     #[test]
     fn test_add() {
         let mut ss = SortedSet::new();
-        assert_eq!(1, ss.add(vec![(2, b"hi".to_vec())]));
+        assert_eq!(1, ss.add(vec![(2, Bytes::from_static(b"hi"))]));
         assert_eq!(
             get_multiple_entries().len() as i64,
             ss.add(get_multiple_entries())
@@ -209,16 +217,16 @@ mod test_sorted_sets_ds {
         let mut ss = SortedSet::new();
 
         ss.add(vec![
-            (1, b"hi_0".to_vec()),
-            (3, b"hi_1".to_vec()),
-            (5, b"hi_2".to_vec()),
+            (1, Bytes::from_static(b"hi_0")),
+            (3, Bytes::from_static(b"hi_1")),
+            (5, Bytes::from_static(b"hi_2")),
         ]);
         assert_eq!(
             ss.range((1, 5)),
             vec![
-                SortedSetMember::new(&b"hi_0".to_vec(), 1),
-                SortedSetMember::new(&b"hi_1".to_vec(), 3),
-                SortedSetMember::new(&b"hi_2".to_vec(), 5),
+                SortedSetMember::new(&Bytes::from_static(b"hi_0"), 1),
+                SortedSetMember::new(&Bytes::from_static(b"hi_1"), 3),
+                SortedSetMember::new(&Bytes::from_static(b"hi_2"), 5),
             ]
         );
         assert_eq!(
@@ -244,6 +252,7 @@ mod test_sorted_sets_ds {
         assert_eq!(0, ss.card());
     }
 
+    // XXX: Fix test case. Am moving to proper skiplist later.
     #[test]
     fn test_pop_max() {
         let mut ss = SortedSet::new();
@@ -251,6 +260,7 @@ mod test_sorted_sets_ds {
         assert_eq!(ss.pop_max(Some(10)), Vec::new());
         ss.add(get_multiple_entries());
         let entries = get_multiple_sorted_set_entries();
+        dbg!(&entries);
         assert_eq!(ss.pop_max(None), vec![entries.last().unwrap().clone()]);
         let first_two: Vec<SortedSetMember> = entries.iter().rev().skip(1).cloned().collect();
         assert_eq!(ss.pop_max(Some(2)), first_two);

@@ -1,4 +1,4 @@
-#![deny(unsafe_code)]
+// #![deny(unsafe_code)]
 #![feature(test, async_closure)]
 #![warn(clippy::all, clippy::nursery)]
 #![feature(const_fn)]
@@ -12,9 +12,6 @@ extern crate lazy_static;
 
 #[macro_use]
 extern crate slog;
-
-#[macro_use]
-extern crate combine;
 
 extern crate rmp_serde as rmps;
 

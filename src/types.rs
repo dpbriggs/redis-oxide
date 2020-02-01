@@ -1,3 +1,5 @@
+use bytes::Bytes;
+use dashmap::DashMap;
 use growable_bloom_filter::GrowableBloom;
 /// Common Types in the project.
 use parking_lot::RwLock;
@@ -14,9 +16,9 @@ use crate::data_structures::sorted_set::SortedSet;
 use crate::data_structures::stack::Stack;
 
 /// These types are used by state and ops to actually perform useful work.
-pub type Value = Vec<u8>;
+pub type Value = Bytes;
 /// Key is the standard type to index our structures
-pub type Key = Vec<u8>;
+pub type Key = Bytes;
 /// Count is used for commands that count.
 pub type Count = i64;
 /// Index is used to represent indices in structures.
@@ -31,19 +33,60 @@ pub type RedisBool = i64;
 /// DumpTimeoutUnitpe alias.
 pub type DumpFile = Arc<Mutex<File>>;
 
-/// RedisValue is the canonical type for values flowing
+/// RedisValueRef is the canonical type for values flowing
 /// through the system. Inputs are converted into RedisValues,
 /// and outputs are converted into RedisValues.
-#[derive(Debug, PartialEq, Clone)]
-pub enum RedisValue {
-    SimpleString(Value),
-    Error(Value),
-    BulkString(Value),
+#[derive(PartialEq, Clone)]
+pub enum RedisValueRef {
+    String(Bytes),
+    Error(Bytes),
+    ErrorMsg(Vec<u8>),
     Int(i64),
-    Array(Vec<RedisValue>),
+    Array(Vec<RedisValueRef>),
     NullArray,
     NullBulkString,
 }
+
+impl std::fmt::Debug for RedisValueRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RedisValueRef::String(s) => {
+                write!(f, "RedisValueRef::String({:?})", String::from_utf8_lossy(s))
+            }
+            RedisValueRef::Error(s) => {
+                write!(f, "RedisValueRef::Error({:?})", String::from_utf8_lossy(s))
+            }
+            RedisValueRef::ErrorMsg(s) => write!(f, "RedisValueRef::ErrorMsg({:?})", s),
+
+            RedisValueRef::Int(i) => write!(f, "RedisValueRef::Int({:?})", i),
+            RedisValueRef::NullBulkString => write!(f, "RedisValueRef::NullBulkString"),
+            RedisValueRef::NullArray => write!(f, "RedisValueRef::NullArray"),
+            RedisValueRef::Array(arr) => {
+                write!(f, "RedisValueRef::Array(")?;
+                for item in arr {
+                    write!(f, "{:?}", item)?;
+                    write!(f, ",")?;
+                }
+                write!(f, ")")?;
+                Ok(())
+            }
+        }
+    }
+}
+
+// // TODO: Get rid of this
+// impl<'a> From<RedisValueRef> for RedisValueRef {
+//     fn from(other: RedisValueRef) -> RedisValueRef {
+//         match other {
+//             RedisValueRef::String(v) => RedisValueRef::BulkString(v.to_vec()),
+//             RedisValueRef::Error(e) => RedisValueRef::Error(e.to_vec()),
+//             RedisValueRef::Int(i) => RedisValueRef::Int(i),
+//             RedisValueRef::Array(a) => RedisValueRef::Array(a.into_iter().map(|i| i.into()).collect()),
+//             RedisValueRef::NullBulkString => RedisValueRef::NullBulkString,
+//             RedisValueRef::NullArray => RedisValueRef::NullArray,
+//         }
+//     }
+// }
 
 /// Special constants in the RESP protocol.
 pub const NULL_BULK_STRING: &str = "$-1\r\n";
@@ -79,8 +122,10 @@ impl From<Vec<Value>> for ReturnValue {
 /// Convenience trait to convert ReturnValues to ReturnValue.
 impl From<Vec<String>> for ReturnValue {
     fn from(strings: Vec<String>) -> ReturnValue {
-        let strings_to_bytes: Vec<Vec<u8>> =
-            strings.into_iter().map(|s| s.as_bytes().to_vec()).collect();
+        let strings_to_bytes: Vec<Bytes> = strings
+            .into_iter()
+            .map(|s| s.as_bytes().to_vec().into())
+            .collect();
         ReturnValue::MultiStringRes(strings_to_bytes)
     }
 }
@@ -96,7 +141,7 @@ impl ReturnValue {
 }
 
 /// Canonical type for Key-Value storage.
-type KeyString = HashMap<Key, Value>;
+type KeyString = DashMap<Key, Value>;
 /// Canonical type for Key-Set storage.
 type KeySet = HashMap<Key, HashSet<Value>>;
 /// Canonical type for Key-List storage.
@@ -111,7 +156,7 @@ type KeyStack = HashMap<Key, Stack<Value>>;
 
 /// Top level database struct.
 /// Holds all StateRef dbs, and will hand them out on request.
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct StateStore {
     pub states: Mutex<HashMap<Index, StateRef>>,
     #[serde(skip)]
@@ -130,10 +175,10 @@ pub type StateRef = Arc<State>;
 
 /// The state stored by redis-oxide. These fields are the ones
 /// used by the various datastructure files (keys.rs, etc)
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct State {
     #[serde(default)]
-    pub kv: RwLock<KeyString>,
+    pub kv: KeyString,
     #[serde(default)]
     pub sets: RwLock<KeySet>,
     #[serde(default)]
@@ -150,20 +195,20 @@ pub struct State {
     pub reciept_map: Mutex<RecieptMap>,
 }
 
-/// Mapping of a ReturnValue to a RedisValue.
-impl From<ReturnValue> for RedisValue {
+/// Mapping of a ReturnValue to a RedisValueRef.
+impl From<ReturnValue> for RedisValueRef {
     fn from(state_res: ReturnValue) -> Self {
         match state_res {
-            ReturnValue::Ok => RedisValue::SimpleString(vec![b'O', b'K']),
-            ReturnValue::Nil => RedisValue::NullBulkString,
-            ReturnValue::StringRes(s) => RedisValue::BulkString(s),
+            ReturnValue::Ok => RedisValueRef::String(Bytes::from_static(b"OK")),
+            ReturnValue::Nil => RedisValueRef::NullBulkString,
+            ReturnValue::StringRes(s) => RedisValueRef::String(s),
             ReturnValue::MultiStringRes(a) => {
-                RedisValue::Array(a.into_iter().map(RedisValue::BulkString).collect())
+                RedisValueRef::Array(a.into_iter().map(RedisValueRef::String).collect())
             }
-            ReturnValue::IntRes(i) => RedisValue::Int(i as i64),
-            ReturnValue::Error(e) => RedisValue::Error(e.to_vec()),
+            ReturnValue::IntRes(i) => RedisValueRef::Int(i as i64),
+            ReturnValue::Error(e) => RedisValueRef::Error(Bytes::from_static(e)),
             ReturnValue::Array(a) => {
-                RedisValue::Array(a.into_iter().map(RedisValue::from).collect())
+                RedisValueRef::Array(a.into_iter().map(RedisValueRef::from).collect())
             }
         }
     }

@@ -19,7 +19,7 @@ macro_rules! create_commands_list {
         {
             let mut res = Vec::new();
             $(
-                let tmp = $ops.iter().cloned().map(|s| s.into_bytes()).collect();
+                let tmp = $ops.iter().cloned().map(|s| s.into()).collect();
                 res.push(ReturnValue::MultiStringRes(tmp));
             )*
             ReturnValue::Array(res)
@@ -54,10 +54,10 @@ pub async fn misc_interact(
     state_store: StateStoreRef,
 ) -> ReturnValue {
     match misc_op {
-        MiscOps::Pong => ReturnValue::StringRes(b"PONG".to_vec()),
+        MiscOps::Pong => ReturnValue::StringRes(Value::from_static(b"PONG")),
         MiscOps::FlushAll => {
             let clear = |state: &StateRef| {
-                state.kv.write().clear();
+                state.kv.clear();
                 state.sets.write().clear();
                 state.lists.write().clear();
                 state.hashes.write().clear();
@@ -76,12 +76,12 @@ pub async fn misc_interact(
         }
         MiscOps::Exists(keys) => ReturnValue::IntRes(
             keys.iter()
-                .map(|key| state.kv.read().contains_key(key))
+                .map(|key| state.kv.contains_key(key))
                 .filter(|exists| *exists)
                 .count() as Count,
         ),
         MiscOps::Keys => {
-            let mut kv_keys: Vec<Key> = state.kv.read().keys().cloned().collect();
+            let mut kv_keys: Vec<Key> = state.kv.iter().map(|r| r.key().clone()).collect();
             let mut set_keys: Vec<Key> = state.sets.read().keys().cloned().collect();
             let mut list_keys: Vec<Key> = state.lists.read().keys().cloned().collect();
             let mut hash_keys: Vec<Key> = state.hashes.read().keys().cloned().collect();
@@ -107,7 +107,7 @@ pub async fn misc_interact(
                 "arch_bits:64",
             ]
             .join("\r\n");
-            ReturnValue::StringRes(info.into_bytes())
+            ReturnValue::StringRes(info.into())
         }
     }
 }
