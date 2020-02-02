@@ -16,6 +16,7 @@ pub enum RESPError {
     IOError(std::io::Error),
     IntParseFailure,
     BadBulkStringSize(i64),
+    BadArraySize(i64),
 }
 
 impl From<std::io::Error> for RESPError {
@@ -78,7 +79,7 @@ impl BufSplit {
 }
 
 #[inline]
-fn word(buf: &mut BytesMut, pos: usize) -> Option<(usize, BufSplit)> {
+fn word(buf: &BytesMut, pos: usize) -> Option<(usize, BufSplit)> {
     if buf.len() <= pos {
         return None;
     }
@@ -91,10 +92,7 @@ fn word(buf: &mut BytesMut, pos: usize) -> Option<(usize, BufSplit)> {
     })
 }
 
-fn int(buf: &mut BytesMut, pos: usize) -> Result<Option<(usize, i64)>, RESPError> {
-    if buf.len() <= pos {
-        return Ok(None);
-    }
+fn int(buf: &BytesMut, pos: usize) -> Result<Option<(usize, i64)>, RESPError> {
     match word(buf, pos) {
         Some((pos, word)) => {
             let s = str::from_utf8(word.as_slice(buf)).map_err(|_| RESPError::IntParseFailure)?;
@@ -105,10 +103,7 @@ fn int(buf: &mut BytesMut, pos: usize) -> Result<Option<(usize, i64)>, RESPError
     }
 }
 
-fn bulk_string(buf: &mut BytesMut, pos: usize) -> RedisResult {
-    if buf.len() <= pos {
-        return Ok(None);
-    }
+fn bulk_string(buf: &BytesMut, pos: usize) -> RedisResult {
     match int(buf, pos)? {
         Some((pos, -1)) => Ok(Some((pos, RedisBufSplit::NullBulkString))),
         Some((pos, size)) if size >= 0 => {
@@ -125,37 +120,19 @@ fn bulk_string(buf: &mut BytesMut, pos: usize) -> RedisResult {
     }
 }
 
-fn simple_string(buf: &mut BytesMut, pos: usize) -> RedisResult {
-    if buf.len() <= pos {
-        return Ok(None);
-    }
-    match word(buf, pos) {
-        Some((pos, word)) => Ok(Some((pos, RedisBufSplit::String(word)))),
-        None => Ok(None),
-    }
+fn simple_string(buf: &BytesMut, pos: usize) -> RedisResult {
+    Ok(word(buf, pos).map(|(pos, word)| (pos, RedisBufSplit::String(word))))
 }
 
-fn error(buf: &mut BytesMut, pos: usize) -> RedisResult {
-    if buf.len() <= pos {
-        return Ok(None);
-    }
-    match word(buf, pos) {
-        Some((pos, word)) => Ok(Some((pos, RedisBufSplit::Error(word)))),
-        None => Ok(None),
-    }
+fn error(buf: &BytesMut, pos: usize) -> RedisResult {
+    Ok(word(buf, pos).map(|(pos, word)| (pos, RedisBufSplit::Error(word))))
 }
 
-fn resp_int(buf: &mut BytesMut, pos: usize) -> RedisResult {
-    if buf.len() <= pos {
-        return Ok(None);
-    }
-    match int(buf, pos)? {
-        Some((pos, int)) => Ok(Some((pos, RedisBufSplit::Int(int)))),
-        None => Ok(None),
-    }
+fn resp_int(buf: &BytesMut, pos: usize) -> RedisResult {
+    Ok(int(buf, pos)?.map(|(pos, int)| (pos, RedisBufSplit::Int(int))))
 }
 
-fn array(buf: &mut BytesMut, pos: usize) -> RedisResult {
+fn array(buf: &BytesMut, pos: usize) -> RedisResult {
     match int(buf, pos)? {
         None => Ok(None),
         Some((pos, -1)) => Ok(Some((pos, RedisBufSplit::NullArray))),
@@ -173,11 +150,11 @@ fn array(buf: &mut BytesMut, pos: usize) -> RedisResult {
             }
             Ok(Some((curr_pos, RedisBufSplit::Array(values))))
         }
-        _ => Err(RESPError::UnexpectedEnd), // TODO: Make proper error here,
+        Some((_pos, bad_num_elements)) => Err(RESPError::BadArraySize(bad_num_elements)),
     }
 }
 
-fn parse(buf: &mut BytesMut, pos: usize) -> RedisResult {
+fn parse(buf: &BytesMut, pos: usize) -> RedisResult {
     if buf.is_empty() {
         return Ok(None);
     }
