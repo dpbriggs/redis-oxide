@@ -3,7 +3,7 @@
 
 * Redis Oxide
 
-[[https://travis-ci.org/dpbriggs/redis-oxide][https://travis-ci.org/dpbriggs/redis-oxide.svg?branch=master]]
+[[https://github.com/dpbriggs/redis-oxide/actions][https://github.com/dpbriggs/redis-oxide/workflows/Redis%20Oxide%20Pipeline/badge.svg]]
 
 A multi-threaded implementation of redis written in rust 🦀.
 
