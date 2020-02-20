@@ -16,8 +16,8 @@ make_reader!(blooms, read_blooms);
 pub async fn bloom_interact(bloom_op: BloomOps, state: StateRef) -> ReturnValue {
     match bloom_op {
         BloomOps::BInsert(bloom_key, value) => {
-            let mut blooms = state.blooms.write();
-            (*blooms)
+            state
+                .blooms
                 .entry(bloom_key)
                 .or_insert_with(|| GrowableBloom::new(DESIRED_FAILURE_RATE, EST_INSERTS))
                 .insert(value);

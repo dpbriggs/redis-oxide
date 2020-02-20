@@ -2,7 +2,6 @@ use bytes::Bytes;
 use dashmap::DashMap;
 use growable_bloom_filter::GrowableBloom;
 /// Common Types in the project.
-use parking_lot::RwLock;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::convert::From;
 use std::sync::atomic::AtomicU64;
@@ -143,16 +142,16 @@ impl ReturnValue {
 /// Canonical type for Key-Value storage.
 type KeyString = DashMap<Key, Value>;
 /// Canonical type for Key-Set storage.
-type KeySet = HashMap<Key, HashSet<Value>>;
+type KeySet = DashMap<Key, HashSet<Value>>;
 /// Canonical type for Key-List storage.
-type KeyList = HashMap<Key, VecDeque<Value>>;
+type KeyList = DashMap<Key, VecDeque<Value>>;
 /// Canonical type for Key-Hash storage.
-type KeyHash = HashMap<Key, HashMap<Key, Value>>;
+type KeyHash = DashMap<Key, HashMap<Key, Value>>;
 /// Canonical type for Key-Hash storage.
-type KeyZSet = HashMap<Key, SortedSet>;
+type KeyZSet = DashMap<Key, SortedSet>;
 /// Canonical type for Key-Bloom storage.
-type KeyBloom = HashMap<Key, GrowableBloom>;
-type KeyStack = HashMap<Key, Stack<Value>>;
+type KeyBloom = DashMap<Key, GrowableBloom>;
+type KeyStack = DashMap<Key, Stack<Value>>;
 
 /// Top level database struct.
 /// Holds all StateRef dbs, and will hand them out on request.
@@ -180,17 +179,17 @@ pub struct State {
     #[serde(default)]
     pub kv: KeyString,
     #[serde(default)]
-    pub sets: RwLock<KeySet>,
+    pub sets: KeySet,
     #[serde(default)]
-    pub lists: RwLock<KeyList>,
+    pub lists: KeyList,
     #[serde(default)]
-    pub hashes: RwLock<KeyHash>,
+    pub hashes: KeyHash,
     #[serde(default)]
-    pub zsets: RwLock<KeyZSet>,
+    pub zsets: KeyZSet,
     #[serde(default)]
-    pub blooms: RwLock<KeyBloom>,
+    pub blooms: KeyBloom,
     #[serde(default)]
-    pub stacks: RwLock<KeyStack>,
+    pub stacks: KeyStack,
     #[serde(skip)]
     pub reciept_map: Mutex<RecieptMap>,
 }

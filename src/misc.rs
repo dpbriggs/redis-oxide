@@ -27,6 +27,19 @@ macro_rules! create_commands_list {
     };
 }
 
+/// Easily get all keys out of each passed type.
+macro_rules! get_all_keys {
+    ($state:expr, $($type:ident),*) => {
+        {
+            let mut all = Vec::new();
+            $(
+                all.extend($state.$type.iter().map(|r| r.key().clone()));
+            )*
+            all
+        }
+    }
+}
+
 lazy_static! {
     static ref ALL_COMMANDS: ReturnValue = {
         use crate::bloom::OP_VARIANTS as BLOOM_VARIANTS;
@@ -58,11 +71,11 @@ pub async fn misc_interact(
         MiscOps::FlushAll => {
             let clear = |state: &StateRef| {
                 state.kv.clear();
-                state.sets.write().clear();
-                state.lists.write().clear();
-                state.hashes.write().clear();
-                state.zsets.write().clear();
-                state.blooms.write().clear();
+                state.sets.clear();
+                state.lists.clear();
+                state.hashes.clear();
+                state.zsets.clear();
+                state.blooms.clear();
             };
             let state_guard = state_store.states.lock();
             for state in state_guard.values() {
@@ -81,17 +94,7 @@ pub async fn misc_interact(
                 .count() as Count,
         ),
         MiscOps::Keys => {
-            let mut kv_keys: Vec<Key> = state.kv.iter().map(|r| r.key().clone()).collect();
-            let mut set_keys: Vec<Key> = state.sets.read().keys().cloned().collect();
-            let mut list_keys: Vec<Key> = state.lists.read().keys().cloned().collect();
-            let mut hash_keys: Vec<Key> = state.hashes.read().keys().cloned().collect();
-            let mut zset_keys: Vec<Key> = state.zsets.read().keys().cloned().collect();
-            let mut bloom_keys: Vec<Key> = state.blooms.read().keys().cloned().collect();
-            kv_keys.append(&mut set_keys);
-            kv_keys.append(&mut list_keys);
-            kv_keys.append(&mut hash_keys);
-            kv_keys.append(&mut zset_keys);
-            kv_keys.append(&mut bloom_keys);
+            let kv_keys = get_all_keys!(state, kv, sets, lists, hashes, zsets, blooms);
             ReturnValue::MultiStringRes(kv_keys)
         }
         MiscOps::PrintCmds => (*ALL_COMMANDS).clone(),
