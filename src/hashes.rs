@@ -20,23 +20,19 @@ op_variants! {
     HSetNX(Key, Key, Value)
 }
 
-macro_rules! ops_error {
-    ($state:expr) => {
-        ReturnValue::Error($state)
-    };
-}
-
 make_reader!(hashes, read_hashes);
 make_writer!(hashes, write_hashes);
+
 pub async fn hash_interact(hash_op: HashOps, state: StateRef) -> ReturnValue {
     match hash_op {
-        HashOps::HGet(key, field) => read_hashes!(state)
-            .get(&key)
-            .and_then(|hashes| hashes.get(&field))
-            .map_or(ReturnValue::Nil, |v| ReturnValue::StringRes(v.clone())),
+        HashOps::HGet(key, field) => match read_hashes!(state, &key) {
+            None => ReturnValue::Nil,
+            Some(hash) => hash
+                .get(&field)
+                .map_or(ReturnValue::Nil, |f| ReturnValue::StringRes(f.clone())),
+        },
         HashOps::HSet(key, field, value) => {
-            let mut hash_lock = state.hashes.write();
-            hash_lock.entry(key).or_default().insert(field, value);
+            state.hashes.entry(key).or_default().insert(field, value);
             ReturnValue::Ok
         }
         HashOps::HExists(key, field) => read_hashes!(state)
@@ -45,18 +41,30 @@ pub async fn hash_interact(hash_op: HashOps, state: StateRef) -> ReturnValue {
             .map_or(ReturnValue::IntRes(0), |v: bool| {
                 ReturnValue::IntRes(if v { 1 } else { 0 })
             }),
-        HashOps::HGetAll(key) => {
-            read_hashes!(state, &key, hash);
-            if hash.is_none() {
-                return ReturnValue::MultiStringRes(vec![]);
+
+        HashOps::HGetAll(key) => match read_hashes!(state, &key) {
+            Some(hash) => {
+                let mut ret = Vec::with_capacity(hash.len() * 2);
+                for (key, value) in hash.iter() {
+                    ret.push(key.clone());
+                    ret.push(value.clone());
+                }
+                ReturnValue::MultiStringRes(ret)
             }
-            let mut ret = Vec::new();
-            for (key, val) in hash.unwrap().iter() {
-                ret.push(key.clone());
-                ret.push(val.clone());
-            }
-            ReturnValue::MultiStringRes(ret)
-        }
+            None => ReturnValue::MultiStringRes(Vec::with_capacity(0)),
+        },
+        // HashOps::HGetAll(key) => {
+        //     read_hashes!(state, &key, hash);
+        //     if hash.is_none() {
+        //         return ;
+        //     }
+        //     let mut ret = Vec::new();
+        //     for (key, val) in hash.unwrap().iter() {
+        //         ret.push(key.clone());
+        //         ret.push(val.clone());
+        //     }
+        //     ReturnValue::MultiStringRes(ret)
+        // }
         HashOps::HMGet(key, fields) => ReturnValue::Array(match read_hashes!(state, &key) {
             None => std::iter::repeat_with(|| ReturnValue::Nil)
                 .take(fields.len())
@@ -76,20 +84,18 @@ pub async fn hash_interact(hash_op: HashOps, state: StateRef) -> ReturnValue {
             None => ReturnValue::Array(vec![]),
         },
         HashOps::HMSet(key, key_values) => {
-            let mut hash_lock = state.hashes.write();
-            hash_lock.entry(key).or_default().extend(key_values);
+            state.hashes.entry(key).or_default().extend(key_values);
             ReturnValue::Ok
         }
         HashOps::HIncrBy(key, field, count) => {
-            let mut hash_lock = state.hashes.write();
-            let hash = hash_lock.entry(key).or_default();
+            let mut hash = state.hashes.entry(key).or_default();
             let mut curr_value = match hash.get(&field) {
                 Some(value) => {
                     let i64_repr = std::str::from_utf8(value)
                         .map(|e| e.parse::<i64>())
                         .unwrap();
                     if i64_repr.is_err() {
-                        return ops_error!(b"Bad Type!");
+                        return ReturnValue::Error(b"Bad Type!");
                     }
                     i64_repr.unwrap()
                 }
@@ -113,7 +119,7 @@ pub async fn hash_interact(hash_op: HashOps, state: StateRef) -> ReturnValue {
         //     None => ReturnValue::IntRes(0),
         // },
         HashOps::HDel(key, fields) => match write_hashes!(state, &key) {
-            Some(hash) => {
+            Some(mut hash) => {
                 let res = fields.iter().filter_map(|field| hash.remove(field)).count();
                 ReturnValue::IntRes(res as Count)
             }
@@ -125,15 +131,15 @@ pub async fn hash_interact(hash_op: HashOps, state: StateRef) -> ReturnValue {
             }
             None => ReturnValue::Array(vec![]),
         },
-        HashOps::HStrLen(key, field) => read_hashes!(state)
-            .get(&key)
-            .and_then(|hashes| hashes.get(&field))
-            .map_or(ReturnValue::IntRes(0), |v| {
-                ReturnValue::IntRes(v.len() as Count)
-            }),
+        // XXX: For some reason there's lifetime issues when doing the usual combinator chain.
+        HashOps::HStrLen(key, field) => match read_hashes!(state, &key) {
+            None => ReturnValue::Nil,
+            Some(hash) => hash
+                .get(&field)
+                .map_or(ReturnValue::Nil, |f| ReturnValue::IntRes(f.len() as Count)),
+        },
         HashOps::HSetNX(key, field, value) => {
-            let mut hash_lock = state.hashes.write();
-            if let Entry::Vacant(ent) = hash_lock.entry(key).or_default().entry(field) {
+            if let Entry::Vacant(ent) = state.hashes.entry(key).or_default().entry(field) {
                 ent.insert(value);
                 ReturnValue::IntRes(1)
             } else {

@@ -30,17 +30,34 @@ make_reader!(sets, read_sets);
 make_writer!(sets, write_sets);
 
 fn many_set_op(state: &StateRef, keys: Vec<Key>, op: SetAction) -> Option<HashSet<Value>> {
-    let state_sets = write_sets!(state);
-    let sets: Vec<&HashSet<Key>> = keys.iter().filter_map(|key| state_sets.get(key)).collect();
-    if sets.is_empty() {
+    let sets_that_exist: Vec<_> = keys
+        .iter()
+        .filter(|&k| state.sets.contains_key(k))
+        .collect();
+    if sets_that_exist.is_empty() {
         return None;
     }
-    let mut head: HashSet<Key> = (*sets.first().unwrap()).to_owned();
-    for set in sets.iter().skip(1).cloned() {
+    let mut head: HashSet<Key> = state
+        .sets
+        .get_mut(sets_that_exist[0])
+        .unwrap()
+        .value_mut()
+        .clone();
+    // TODO: Make this _way_ cleaner.
+    for set_key in sets_that_exist.into_iter().skip(1) {
         head = match op {
-            SetAction::Diff => head.difference(set).cloned().collect(),
-            SetAction::Union => head.union(set).cloned().collect(),
-            SetAction::Inter => head.intersection(set).cloned().collect(),
+            SetAction::Diff => head
+                .difference(state.sets.get(set_key).unwrap().value())
+                .cloned()
+                .collect(),
+            SetAction::Union => head
+                .union(state.sets.get(set_key).unwrap().value())
+                .cloned()
+                .collect(),
+            SetAction::Inter => head
+                .intersection(state.sets.get(set_key).unwrap().value())
+                .cloned()
+                .collect(),
         }
     }
     Some(head)
@@ -49,8 +66,7 @@ fn many_set_op(state: &StateRef, keys: Vec<Key>, op: SetAction) -> Option<HashSe
 pub async fn set_interact(set_op: SetOps, state: StateRef) -> ReturnValue {
     match set_op {
         SetOps::SAdd(set_key, vals) => {
-            let mut set_lock = state.sets.write();
-            let set = set_lock.entry(set_key).or_default();
+            let mut set = state.sets.entry(set_key).or_default();
             vals.into_iter()
                 .fold(0, |acc, val| acc + set.insert(val) as Count)
                 .into()
@@ -64,7 +80,7 @@ pub async fn set_interact(set_op: SetOps, state: StateRef) -> ReturnValue {
             .unwrap_or(0)
             .into(),
         SetOps::SRem(set_key, vals) => write_sets!(state, &set_key)
-            .map(|set| {
+            .map(|mut set| {
                 vals.into_iter()
                     .fold(0, |acc, val| acc + set.insert(val) as Count)
             })
@@ -108,8 +124,7 @@ pub async fn set_interact(set_op: SetOps, state: StateRef) -> ReturnValue {
         },
         // There's some surprising complexity behind this command
         SetOps::SPop(key, count) => {
-            let mut sets = write_sets!(state);
-            let set = match sets.get_mut(&key) {
+            let mut set = match state.sets.get_mut(&key) {
                 Some(s) => s,
                 None => return ReturnValue::Nil,
             };
@@ -141,8 +156,8 @@ pub async fn set_interact(set_op: SetOps, state: StateRef) -> ReturnValue {
                 return ReturnValue::IntRes(0);
             }
 
-            let mut sets = write_sets!(state);
-            let src_set = sets.get_mut(&src).unwrap();
+            // TODO: Why are we allowed to unwrap here? It may not be alive at this time.
+            let mut src_set = state.sets.get_mut(&src).unwrap();
             match src_set.take(&member) {
                 Some(res) => {
                     sets.get_mut(&dest).unwrap().insert(res);

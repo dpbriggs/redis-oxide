@@ -26,13 +26,12 @@ fn deal_with_negative_indices(coll_size: Count, bounds: (Index, Index)) -> (Inde
 pub async fn zset_interact(zset_op: ZSetOps, state: StateRef) -> ReturnValue {
     match zset_op {
         ZSetOps::ZAdd(zset_key, member_scores) => {
-            let mut zset_lock = state.zsets.write();
-            let zset = zset_lock.entry(zset_key).or_default();
+            let mut zset = state.zsets.entry(zset_key).or_default();
             let num_added = zset.add(member_scores);
             ReturnValue::IntRes(num_added)
         }
         ZSetOps::ZRem(zset_key, keys) => write_zsets!(state, &zset_key)
-            .map(|zset| zset.remove(&keys))
+            .map(|mut zset| zset.remove(&keys))
             .unwrap_or(0)
             .into(),
         ZSetOps::ZRange(zset_key, start, stop) => read_zsets!(state, &zset_key)
@@ -54,7 +53,7 @@ pub async fn zset_interact(zset_op: ZSetOps, state: StateRef) -> ReturnValue {
             .map(ReturnValue::IntRes)
             .unwrap_or(ReturnValue::Nil),
         ZSetOps::ZPopMax(zset_key, count) => write_zsets!(state, &zset_key)
-            .map(|zset| {
+            .map(|mut zset| {
                 zset.pop_max(Some(count))
                     .into_iter()
                     .fold(Vec::new(), |mut acc, zset_mem| {
@@ -66,7 +65,7 @@ pub async fn zset_interact(zset_op: ZSetOps, state: StateRef) -> ReturnValue {
             .map(ReturnValue::Array)
             .unwrap_or_else(|| ReturnValue::Array(vec![])),
         ZSetOps::ZPopMin(zset_key, count) => write_zsets!(state, &zset_key)
-            .map(|zset| {
+            .map(|mut zset| {
                 zset.pop_min(Some(count))
                     .into_iter()
                     .fold(Vec::new(), |mut acc, zset_mem| {

@@ -1,7 +1,6 @@
 use crate::timeouts::blocking_key_timeout;
 use crate::types::{Count, Index, Key, ReturnValue, StateRef, UTimeout, Value};
 use crate::{make_reader, make_writer, op_variants};
-use std::collections::VecDeque;
 
 op_variants! {
     ListOps,
@@ -28,51 +27,43 @@ make_writer!(lists, write_lists);
 pub async fn list_interact(list_op: ListOps, state: StateRef) -> ReturnValue {
     match list_op {
         ListOps::LPush(key, vals) => {
-            let mut list_lock = state.lists.write();
-            let list = list_lock.entry(key.clone()).or_default();
+            let mut list = state.lists.entry(key.clone()).or_default();
             for val in vals {
                 list.push_front(val);
             }
             state.wake_list(&key);
             ReturnValue::IntRes(list.len() as Count)
         }
-        ListOps::LPushX(key, val) => {
-            let mut list_lock = state.lists.write();
-            match list_lock.get_mut(&key) {
-                Some(list) => {
-                    list.push_front(val);
-                    state.wake_list(&key);
-                    ReturnValue::IntRes(list.len() as Count)
-                }
-                None => ReturnValue::IntRes(0),
+        ListOps::LPushX(key, val) => match state.lists.get_mut(&key) {
+            Some(mut list) => {
+                list.push_front(val);
+                state.wake_list(&key);
+                ReturnValue::IntRes(list.len() as Count)
             }
-        }
-        ListOps::RPushX(key, val) => {
-            let mut list_lock = state.lists.write();
-            match list_lock.get_mut(&key) {
-                Some(list) => {
-                    list.push_back(val);
-                    state.wake_list(&key);
-                    ReturnValue::IntRes(list.len() as Count)
-                }
-                None => ReturnValue::IntRes(0),
+            None => ReturnValue::IntRes(0),
+        },
+        ListOps::RPushX(key, val) => match state.lists.get_mut(&key) {
+            Some(mut list) => {
+                list.push_back(val);
+                state.wake_list(&key);
+                ReturnValue::IntRes(list.len() as Count)
             }
-        }
+            None => ReturnValue::IntRes(0),
+        },
         ListOps::LLen(key) => match read_lists!(state, &key) {
             Some(l) => ReturnValue::IntRes(l.len() as Count),
             None => ReturnValue::IntRes(0),
         },
-        ListOps::LPop(key) => match write_lists!(state, &key).and_then(VecDeque::pop_front) {
+        ListOps::LPop(key) => match write_lists!(state, &key).and_then(|mut v| v.pop_front()) {
             Some(v) => ReturnValue::StringRes(v),
             None => ReturnValue::Nil,
         },
-        ListOps::RPop(key) => match write_lists!(state, &key).and_then(VecDeque::pop_back) {
+        ListOps::RPop(key) => match write_lists!(state, &key).and_then(|mut v| v.pop_back()) {
             Some(v) => ReturnValue::StringRes(v),
             None => ReturnValue::Nil,
         },
         ListOps::RPush(key, vals) => {
-            let mut list_lock = state.lists.write();
-            let list = list_lock.entry(key).or_default();
+            let mut list = state.lists.entry(key).or_default();
             for val in vals {
                 list.push_back(val)
             }
@@ -91,7 +82,7 @@ pub async fn list_interact(list_op: ListOps, state: StateRef) -> ReturnValue {
             None => ReturnValue::Nil,
         },
         ListOps::LSet(key, index, value) => match write_lists!(state, &key) {
-            Some(list) => {
+            Some(mut list) => {
                 let llen = list.len() as i64;
                 let real_index = if index < 0 { llen + index } else { index };
                 if !(0 <= real_index && real_index < llen) {
@@ -130,7 +121,7 @@ pub async fn list_interact(list_op: ListOps, state: StateRef) -> ReturnValue {
         },
         ListOps::LTrim(key, start_index, end_index) => {
             match write_lists!(state, &key) {
-                Some(list) => {
+                Some(mut list) => {
                     let start_index =
                         std::cmp::max(0, if start_index < 0 { 0 } else { start_index } as usize);
                     let end_index = std::cmp::min(
@@ -152,33 +143,31 @@ pub async fn list_interact(list_op: ListOps, state: StateRef) -> ReturnValue {
                 None => ReturnValue::Ok,
             }
         }
-        ListOps::RPopLPush(source, dest) => {
-            let mut lists = write_lists!(state);
-            match lists.get_mut(&source) {
+        ListOps::RPopLPush(source, dest) => match state.lists.get_mut(&source) {
+            None => ReturnValue::Nil,
+            Some(mut source_list) => match source_list.pop_back() {
                 None => ReturnValue::Nil,
-                Some(source_list) => match source_list.pop_back() {
-                    None => ReturnValue::Nil,
-                    Some(value) => {
-                        if source == dest {
-                            source_list.push_back(value.clone());
-                        } else {
-                            lists
-                                .entry(dest.clone())
-                                .or_default()
-                                .push_back(value.clone());
-                            state.wake_list(&dest);
-                        }
-                        ReturnValue::StringRes(value)
+                Some(value) => {
+                    if source == dest {
+                        source_list.push_back(value.clone());
+                    } else {
+                        state
+                            .lists
+                            .entry(dest.clone())
+                            .or_default()
+                            .push_back(value.clone());
+                        state.wake_list(&dest);
                     }
-                },
-            }
-        }
+                    ReturnValue::StringRes(value)
+                }
+            },
+        },
         ListOps::BLPop(key, timeout) => {
             let state_clone = state.clone();
             let key_clone = key.clone();
             let bl = move || {
                 write_lists!(state, &key)
-                    .and_then(VecDeque::pop_front)
+                    .and_then(|mut v| v.pop_front())
                     .map(ReturnValue::StringRes)
             };
             blocking_key_timeout(Box::new(bl), state_clone, key_clone, timeout).await
@@ -188,7 +177,7 @@ pub async fn list_interact(list_op: ListOps, state: StateRef) -> ReturnValue {
             let key_clone = key.clone();
             let bl = move || {
                 write_lists!(state, &key)
-                    .and_then(VecDeque::pop_back)
+                    .and_then(|mut v| v.pop_back())
                     .map(ReturnValue::StringRes)
             };
             blocking_key_timeout(Box::new(bl), state_clone, key_clone, timeout).await

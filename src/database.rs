@@ -109,6 +109,7 @@ pub fn get_dump_file(config: &Config) -> DumpFile {
         Ok(f) => f,
         Err(e) => fatal_panic!(format!("Failed to open dump file! {}", e.to_string())),
     };
+    // TODO: Use tokio locks here
     Arc::new(Mutex::new(opened_file))
 }
 

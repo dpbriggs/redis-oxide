@@ -133,20 +133,21 @@ The general design of =redis-oxide= is:
 Therefore, if you want to do something like implement =hashes=, you will need to:
 
 1. Add a new struct member in =State=.
-   1. This would look like like =hashes: RwLock<KeyHashes>=, where =type KeyHashes = HashMap<Key, HashMap<Key,Value>>=.
-2. Define a new file for your data type, =src/hashes.rs=.
+   1. You first define the type: =type KeyHash = DashMap<Key, HashMap<Key, Value>>=
+   2. Then add it to State: =pub hashes: KeyHash=
+3. Define a new file for your data type, =src/hashes.rs=.
    1. Keep your type definitions in =src/types.rs=!
-3. Create an enum to track your commands, =pub enum HashOps { HSet(Key, Key, Value) }=
-4. Implement parsing for your enum in =src/ops.rs=.
+4. Create an enum to track your commands, =op_variants! { HashOps, HGet(Key, Key), HSet(Key, Key, Value) }=
+5. Implement parsing for your enum in =src/ops.rs=.
    1. You should be able to follow the existing parsing infrastructure. Should just be extra entries in =translate_array= in =src/ops.rs=.
    2. You will need to add your return type to the =ok!= macro. Just copy/paste an existing line.
    3. You should return something like =ok!(HashOps::HSet(x, y, z))=.
    4. A stretch goal is to automate parsing.
-5. Implement a =async *_interact= for your type; I would follow existing implementations (eg. =src/keys.rs=).
+6. Implement a =async *_interact= for your type; I would follow existing implementations (eg. =src/keys.rs=).
    1. I would keep the redis docs open, and play around with the commands in the web console (or wherever) to determine behavior.
    2. Add a new match entry in the =async op_interact= function in =src/ops.rs=.
-6. Test it! (follow existing testing bits; eg. =src/keys.rs=).
-7. Please add the commands to the list below.
+7. Test it! (follow existing testing bits; eg. =src/keys.rs=).
+8. Please add the commands to the list below.
    1. If you're using emacs, just fire up the server and evaluate the babel block below (see =README.org= source)
    2. Alternatively, copy the script into a terminal and copy/paste the output below. (see raw =README.org=)
 

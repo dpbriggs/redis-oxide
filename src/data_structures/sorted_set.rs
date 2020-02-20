@@ -3,6 +3,10 @@ use std::cmp::Ordering;
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeSet, HashMap};
 
+// TODO: Use convenient-skiplist
+
+// TODO: Why doesn't this actually allow it? 🤔
+#[allow(clippy::mutable_key_type)]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct SortedSetMember {
     pub score: Score,
