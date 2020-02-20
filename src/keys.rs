@@ -66,6 +66,7 @@ pub async fn key_interact(key_op: KeyOps, state: StateRef) -> ReturnValue {
                 None => ReturnValue::Error(b"no such key"),
             }
         }
+        // TODO: Keep this?
         KeyOps::Test(_key) => {
             // let value: Value = state
             //     .kv

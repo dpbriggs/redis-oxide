@@ -1,0 +1,5 @@
+* Ideas
+
+** Use sled for actual paging to disk
+   - Use it for the actual database?
+     - Actually we lose some features we'd want. We'll just represent  gs
