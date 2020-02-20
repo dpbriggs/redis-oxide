@@ -31,11 +31,6 @@ pub async fn hash_interact(hash_op: HashOps, state: StateRef) -> ReturnValue {
                 .get(&field)
                 .map_or(ReturnValue::Nil, |f| ReturnValue::StringRes(f.clone())),
         },
-        // HashOps::HGet(key, field) => state
-        //     .hashes
-        //     .get(&key)
-        //     .and_then(|hashes| hashes.get(&field))
-        //     .map_or(ReturnValue::Nil, |v| ReturnValue::StringRes(v.clone())),
         HashOps::HSet(key, field, value) => {
             state.hashes.entry(key).or_default().insert(field, value);
             ReturnValue::Ok
@@ -143,13 +138,6 @@ pub async fn hash_interact(hash_op: HashOps, state: StateRef) -> ReturnValue {
                 .get(&field)
                 .map_or(ReturnValue::Nil, |f| ReturnValue::IntRes(f.len() as Count)),
         },
-
-        // HashOps::HStrLen(key, field) => read_hashes!(state)
-        //     .get(&key)
-        //     .and_then(|hashes| hashes.get(&field))
-        //     .map_or(ReturnValue::IntRes(0), |v| {
-        //         ReturnValue::IntRes(v.len() as Count)
-        //     }),
         HashOps::HSetNX(key, field, value) => {
             if let Entry::Vacant(ent) = state.hashes.entry(key).or_default().entry(field) {
                 ent.insert(value);

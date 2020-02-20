@@ -9,10 +9,7 @@ macro_rules! make_reader {
             };
             ($state:expr, $key:expr) => {
                 $state.$id.get($key)
-            }; // ($state:expr, $key:expr, $var_name:ident) => {
-               //     let __temp_name = $state.$id;
-               //     let $var_name = __temp_name.get($key);
-               // };
+            };
         }
     };
 }
@@ -28,10 +25,7 @@ macro_rules! make_writer {
             };
             ($state:expr, $key:expr) => {
                 $state.$id.get_mut($key)
-            }; // ($state: expr, $key:expr, $var_name:ident) => {
-               //     let mut __temp_name = $state.$id;
-               //     let $var_name = __temp_name.get_mut($key).unwrap();
-               // };
+            };
         }
     };
 }
