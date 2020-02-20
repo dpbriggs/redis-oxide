@@ -26,7 +26,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         info!(LOGGER, "Spawning database saving task...");
         tokio::spawn(save_state_interval(state.clone(), dump_file.clone()));
     } else {
-        info!(
+        warn!(
             LOGGER,
             "Database is in memory-only mode. STATE WILL NOT BE SAVED!"
         );
