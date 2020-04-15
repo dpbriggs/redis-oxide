@@ -116,7 +116,7 @@ impl TryFrom<RedisValueRef> for Bytes {
 
     fn try_from(r: RedisValueRef) -> Result<Value, Self::Error> {
         match r {
-            RedisValueRef::String(s) => Ok(s),
+            RedisValueRef::BulkString(s) => Ok(s),
             _ => Err(OpsError::InvalidType),
         }
     }
@@ -130,7 +130,7 @@ impl TryFrom<&RedisValueRef> for Bytes {
         // and therefore there's a live reference count at this point.
         // If there's issues, use this instead: Value::try_from(r.clone())
         match r {
-            RedisValueRef::String(s) => unsafe {
+            RedisValueRef::BulkString(s) => unsafe {
                 let len = s.len();
                 let buf: &'static [u8] = std::slice::from_raw_parts(s.as_ptr(), len);
                 Ok(Value::from_static(buf))
@@ -145,7 +145,7 @@ impl TryFrom<RedisValueRef> for String {
 
     fn try_from(r: RedisValueRef) -> Result<String, Self::Error> {
         match r {
-            RedisValueRef::String(s) => Ok(String::from_utf8_lossy(&s).to_string()),
+            RedisValueRef::BulkString(s) => Ok(String::from_utf8_lossy(&s).to_string()),
             _ => Err(OpsError::InvalidType),
         }
     }
@@ -166,7 +166,7 @@ impl TryFrom<&RedisValueRef> for Count {
         match r {
             RedisValueRef::Int(e) => Ok(*e as Count),
             // TODO: Not copy here
-            RedisValueRef::String(s) => match String::from_utf8(s.to_owned().to_vec()) {
+            RedisValueRef::BulkString(s) => match String::from_utf8(s.to_owned().to_vec()) {
                 Ok(s) => s.parse().map_err(|_| OpsError::InvalidType),
                 Err(_) => Err(OpsError::InvalidType),
             },
@@ -713,7 +713,7 @@ fn translate_array(array: &[RedisValueRef]) -> Result<Ops, OpsError> {
 pub fn translate(rv: RedisValueRef) -> Result<Ops, OpsError> {
     match rv {
         RedisValueRef::Array(vals) => translate_array(&vals),
-        bs @ RedisValueRef::String(_) => translate_array(&[bs]),
+        bs @ RedisValueRef::BulkString(_) => translate_array(&[bs]),
         _ => Err(OpsError::UnknownOp),
     }
 }

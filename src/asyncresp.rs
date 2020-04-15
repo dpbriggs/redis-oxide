@@ -42,7 +42,7 @@ enum RedisBufSplit {
 impl RedisBufSplit {
     fn redis_value(self, buf: &Bytes) -> RedisValueRef {
         match self {
-            RedisBufSplit::String(bfs) => RedisValueRef::String(bfs.as_bytes(buf)),
+            RedisBufSplit::String(bfs) => RedisValueRef::BulkString(bfs.as_bytes(buf)),
             RedisBufSplit::Error(bfs) => RedisValueRef::Error(bfs.as_bytes(buf)),
             RedisBufSplit::Array(arr) => {
                 RedisValueRef::Array(arr.into_iter().map(|bfs| bfs.redis_value(buf)).collect())
@@ -209,7 +209,12 @@ fn write_redis_value(item: RedisValueRef, dst: &mut BytesMut) {
             dst.extend_from_slice(&e);
             dst.extend_from_slice(b"\r\n");
         }
-        RedisValueRef::String(s) => {
+        RedisValueRef::SimpleString(s) => {
+            dst.extend_from_slice(b"+");
+            dst.extend_from_slice(&s);
+            dst.extend_from_slice(b"\r\n");
+        }
+        RedisValueRef::BulkString(s) => {
             dst.extend_from_slice(b"$");
             dst.extend_from_slice(s.len().to_string().as_bytes());
             dst.extend_from_slice(b"\r\n");
@@ -343,11 +348,11 @@ mod resp_parser_tests {
 
     #[test]
     fn test_bulk_string() {
-        let t = RedisValueRef::String(ezs());
+        let t = RedisValueRef::BulkString(ezs());
         let s = "$5\r\nhello\r\n";
         generic_test(s, t);
 
-        let t = RedisValueRef::String(Bytes::from_static(b""));
+        let t = RedisValueRef::BulkString(Bytes::from_static(b""));
         let s = "$0\r\n\r\n";
         generic_test(s, t);
     }
@@ -374,8 +379,8 @@ mod resp_parser_tests {
         generic_test(s, t);
 
         let inner = vec![
-            RedisValueRef::String(Bytes::from_static(b"foo")),
-            RedisValueRef::String(Bytes::from_static(b"bar")),
+            RedisValueRef::BulkString(Bytes::from_static(b"foo")),
+            RedisValueRef::BulkString(Bytes::from_static(b"bar")),
         ];
         let t = RedisValueRef::Array(inner);
         let s = "*2\r\n$3\r\nfoo\r\n$3\r\nbar\r\n";
@@ -395,7 +400,7 @@ mod resp_parser_tests {
             RedisValueRef::Int(2),
             RedisValueRef::Int(3),
             RedisValueRef::Int(4),
-            RedisValueRef::String(Bytes::from_static(b"foobar")),
+            RedisValueRef::BulkString(Bytes::from_static(b"foobar")),
         ];
         let t = RedisValueRef::Array(inner);
         let s = "*5\r\n:1\r\n:2\r\n:3\r\n:4\r\n$6\r\nfoobar\r\n";
@@ -408,7 +413,7 @@ mod resp_parser_tests {
                 RedisValueRef::Int(3),
             ]),
             RedisValueRef::Array(vec![
-                RedisValueRef::String(Bytes::from_static(b"Foo")),
+                RedisValueRef::BulkString(Bytes::from_static(b"Foo")),
                 RedisValueRef::Error(Bytes::from_static(b"Bar")),
             ]),
         ];
@@ -417,9 +422,9 @@ mod resp_parser_tests {
         generic_test(s, t);
 
         let inner = vec![
-            RedisValueRef::String(Bytes::from_static(b"foo")),
+            RedisValueRef::BulkString(Bytes::from_static(b"foo")),
             RedisValueRef::NullBulkString,
-            RedisValueRef::String(Bytes::from_static(b"bar")),
+            RedisValueRef::BulkString(Bytes::from_static(b"bar")),
         ];
         let t = RedisValueRef::Array(inner);
         let s = "*3\r\n$3\r\nfoo\r\n$-1\r\n$3\r\nbar\r\n";

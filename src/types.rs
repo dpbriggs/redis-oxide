@@ -37,7 +37,8 @@ pub type DumpFile = Arc<Mutex<File>>;
 /// and outputs are converted into RedisValues.
 #[derive(PartialEq, Clone)]
 pub enum RedisValueRef {
-    String(Bytes),
+    BulkString(Bytes),
+    SimpleString(Bytes),
     Error(Bytes),
     ErrorMsg(Vec<u8>),
     Int(i64),
@@ -49,9 +50,16 @@ pub enum RedisValueRef {
 impl std::fmt::Debug for RedisValueRef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            RedisValueRef::String(s) => {
-                write!(f, "RedisValueRef::String({:?})", String::from_utf8_lossy(s))
-            }
+            RedisValueRef::BulkString(s) => write!(
+                f,
+                "RedisValueRef::BulkString({:?})",
+                String::from_utf8_lossy(s)
+            ),
+            RedisValueRef::SimpleString(s) => write!(
+                f,
+                "RedisValueRef::SimpleString({:?})",
+                String::from_utf8_lossy(s)
+            ),
             RedisValueRef::Error(s) => {
                 write!(f, "RedisValueRef::Error({:?})", String::from_utf8_lossy(s))
             }
@@ -198,11 +206,11 @@ pub struct State {
 impl From<ReturnValue> for RedisValueRef {
     fn from(state_res: ReturnValue) -> Self {
         match state_res {
-            ReturnValue::Ok => RedisValueRef::String(Bytes::from_static(b"OK")),
+            ReturnValue::Ok => RedisValueRef::SimpleString(Bytes::from_static(b"OK")),
             ReturnValue::Nil => RedisValueRef::NullBulkString,
-            ReturnValue::StringRes(s) => RedisValueRef::String(s),
+            ReturnValue::StringRes(s) => RedisValueRef::BulkString(s),
             ReturnValue::MultiStringRes(a) => {
-                RedisValueRef::Array(a.into_iter().map(RedisValueRef::String).collect())
+                RedisValueRef::Array(a.into_iter().map(RedisValueRef::BulkString).collect())
             }
             ReturnValue::IntRes(i) => RedisValueRef::Int(i as i64),
             ReturnValue::Error(e) => RedisValueRef::Error(Bytes::from_static(e)),
