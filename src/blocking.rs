@@ -34,7 +34,7 @@ impl KeyBlocking {
 
 impl Future for KeyBlocking {
     type Output = ReturnValue;
-    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         if self.state.receipt_timed_out(self.receipt) {
             return Poll::Ready(ReturnValue::Nil);
         }

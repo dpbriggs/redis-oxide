@@ -6,7 +6,7 @@ use std::fmt;
 const DEFAULT_DB: Index = 0;
 
 impl fmt::Display for ReturnValue {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ReturnValue::Ok => write!(f, "OK"),
             ReturnValue::StringRes(s) => write!(f, "{:?}", s),
