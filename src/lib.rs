@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 #![warn(rust_2018_idioms)]
 // #![deny(unsafe_code)]
 #![feature(test, async_closure)]

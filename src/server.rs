@@ -13,8 +13,13 @@ use futures::StreamExt;
 use futures_util::sink::SinkExt;
 use std::net::SocketAddr;
 use std::sync::atomic::Ordering;
-use tokio::net::{TcpListener, TcpStream};
+// use tokio::net::{TcpListener, TcpStream};
+use std::net::{TcpListener, TcpStream};
 use tokio_util::codec::Decoder;
+use tokio_util::compat::Compat;
+use tokio_util::compat::FuturesAsyncReadCompatExt;
+
+use ringbahn::Ring;
 
 fn incr_and_save_if_required(state: StateStoreRef, dump_file: DumpFile) {
     state.commands_ran_since_save.fetch_add(1, Ordering::SeqCst);
@@ -40,6 +45,7 @@ fn incr_and_save_if_required(state: StateStoreRef, dump_file: DumpFile) {
 /// thread pool.
 async fn process(socket: TcpStream, state_store: StateStoreRef, dump_file: DumpFile) {
     tokio::spawn(async move {
+        let socket: Compat<Ring<TcpStream>> = Ring::new(socket).compat();
         let mut state = state_store.get_default();
         let mut transport = RespParser::default().framed(socket);
         while let Some(redis_value) = transport.next().await {
@@ -89,7 +95,7 @@ pub async fn socket_listener(state_store: StateStoreRef, dump_file: DumpFile, co
     };
 
     // Second, bind/listen on that address
-    let mut listener = match TcpListener::bind(&addr).await {
+    let listener = match TcpListener::bind(&addr) {
         Ok(s) => s,
         Err(e) => {
             error!(
@@ -104,13 +110,22 @@ pub async fn socket_listener(state_store: StateStoreRef, dump_file: DumpFile, co
     };
     // Finally, loop over each TCP accept and spawn a handler.
     info!(LOGGER, "Listening on: {}", addr);
-    loop {
-        match listener.accept().await {
-            Ok((socket, _)) => {
+    for socket in listener.incoming() {
+        match socket {
+            Ok(socket) => {
                 debug!(LOGGER, "Accepted connection!");
                 process(socket, state_store.clone(), dump_file.clone()).await;
             }
             Err(e) => error!(LOGGER, "Failed to establish connectin: {:?}", e),
-        };
+        }
     }
+    // loop {
+    //     match listener.incoming() {
+    //         Ok((socket, _)) => {
+    //             debug!(LOGGER, "Accepted connection!");
+    //             process(socket, state_store.clone(), dump_file.clone()).await;
+    //         }
+    //         Err(e) => error!(LOGGER, "Failed to establish connectin: {:?}", e),
+    //     };
+    // }
 }

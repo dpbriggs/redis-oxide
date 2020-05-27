@@ -187,11 +187,10 @@ impl Decoder for RespParser {
     }
 }
 
-impl Encoder for RespParser {
-    type Item = RedisValueRef;
+impl Encoder<RedisValueRef> for RespParser {
     type Error = io::Error;
 
-    fn encode(&mut self, item: Self::Item, dst: &mut BytesMut) -> io::Result<()> {
+    fn encode(&mut self, item: RedisValueRef, dst: &mut BytesMut) -> io::Result<()> {
         write_redis_value(item, dst);
         Ok(())
     }

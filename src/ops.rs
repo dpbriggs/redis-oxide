@@ -130,11 +130,15 @@ impl TryFrom<&RedisValueRef> for Bytes {
         // and therefore there's a live reference count at this point.
         // If there's issues, use this instead: Value::try_from(r.clone())
         match r {
-            RedisValueRef::BulkString(s) => unsafe {
-                let len = s.len();
-                let buf: &'static [u8] = std::slice::from_raw_parts(s.as_ptr(), len);
-                Ok(Value::from_static(buf))
-            },
+            // RedisValueRef::BulkString(s) => unsafe {
+            //     let len = s.len();
+            //     dbg!("{}", s.as_ptr());
+            //     let buf: &'static [u8] = std::slice::from_raw_parts(s.as_ptr(), len);
+            //     Ok(Value::from_static(buf))
+            // },
+            RedisValueRef::BulkString(s) => {
+                Ok(Value::try_from(s.clone()).expect("Failed to decode value from buf"))
+            }
             _ => Err(OpsError::InvalidType),
         }
     }
