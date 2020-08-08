@@ -54,7 +54,7 @@ pub async fn zset_interact(zset_op: ZSetOps, state: StateRef) -> ReturnValue {
             .unwrap_or(ReturnValue::Nil),
         ZSetOps::ZPopMax(zset_key, count) => write_zsets!(state, &zset_key)
             .map(|mut zset| {
-                zset.pop_max(Some(count))
+                zset.pop_max(count)
                     .into_iter()
                     .fold(Vec::new(), |mut acc, zset_mem| {
                         acc.push(ReturnValue::IntRes(zset_mem.score));
@@ -66,7 +66,7 @@ pub async fn zset_interact(zset_op: ZSetOps, state: StateRef) -> ReturnValue {
             .unwrap_or_else(|| ReturnValue::Array(vec![])),
         ZSetOps::ZPopMin(zset_key, count) => write_zsets!(state, &zset_key)
             .map(|mut zset| {
-                zset.pop_min(Some(count))
+                zset.pop_min(count)
                     .into_iter()
                     .fold(Vec::new(), |mut acc, zset_mem| {
                         acc.push(ReturnValue::IntRes(zset_mem.score));

@@ -1,5 +1,4 @@
 #![warn(rust_2018_idioms)]
-// #![deny(unsafe_code)]
 #![feature(test, async_closure)]
 #![warn(clippy::all, clippy::nursery)]
 #![feature(const_fn)]
