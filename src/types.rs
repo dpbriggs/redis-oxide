@@ -165,7 +165,7 @@ type KeyStack = DashMap<Key, Stack<Value>>;
 /// Holds all StateRef dbs, and will hand them out on request.
 #[derive(Default, Serialize, Deserialize)]
 pub struct StateStore {
-    pub states: Mutex<HashMap<Index, StateRef>>,
+    pub states: DashMap<Index, StateRef>,
     #[serde(skip)]
     pub commands_ran_since_save: AtomicU64,
     #[serde(skip)]

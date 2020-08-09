@@ -38,8 +38,7 @@ impl State {
 
 impl StateStore {
     pub fn get_or_create(&self, index: Index) -> StateRef {
-        let mut guard = self.states.lock();
-        guard.entry(index).or_default().clone()
+        self.states.entry(index).or_default().clone()
     }
 
     pub fn get_default(&self) -> StateRef {

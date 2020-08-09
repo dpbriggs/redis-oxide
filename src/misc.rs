@@ -77,10 +77,13 @@ pub async fn misc_interact(
                 state.zsets.clear();
                 state.blooms.clear();
             };
-            let state_guard = state_store.states.lock();
-            for state in state_guard.values() {
-                clear(state);
+            for state in state_store.states.iter_mut() {
+                clear(&state);
             }
+            // let state_guard = state_store.states.lock();
+            // for state in state_guard.values() {
+            //     clear(state);
+            // }
             ReturnValue::Ok
         }
         MiscOps::FlushDB => {
