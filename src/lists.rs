@@ -1,3 +1,4 @@
+use crate::ops::RVec;
 use crate::timeouts::blocking_key_timeout;
 use crate::types::{Count, Index, Key, ReturnValue, StateRef, UTimeout, Value};
 use crate::{make_reader, make_writer, op_variants};
@@ -7,7 +8,7 @@ op_variants! {
     LIndex(Key, Index),
     LLen(Key),
     LPop(Key),
-    LPush(Key, Vec<Value>),
+    LPush(Key, RVec<Value>),
     LPushX(Key, Value),
     LRange(Key, Index, Index),
     LSet(Key, Index, Value),

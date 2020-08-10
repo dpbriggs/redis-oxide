@@ -1,13 +1,14 @@
 use crate::op_variants;
+use crate::ops::RVec;
 use crate::types::{Count, Key, ReturnValue, StateRef, Value};
 
 op_variants! {
     KeyOps,
     Set(Key, Value),
-    MSet(Vec<(Key, Value)>),
+    MSet(RVec<(Key, Value)>),
     Get(Key),
-    MGet(Vec<Key>),
-    Del(Vec<Key>),
+    MGet(RVec<Key>),
+    Del(RVec<Key>),
     Rename(Key, Key),
     RenameNx(Key, Key),
     Test(Key)
