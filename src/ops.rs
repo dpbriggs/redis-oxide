@@ -254,7 +254,7 @@ where
 
 /// Transform &[RedisValueRef] into (KeyType, Vec<TailType>)
 /// Used for commands like DEL arg1 arg2...
-fn smallvec_get_key_and_tail<'a, KeyType, TailType>(
+fn get_key_and_tail<'a, KeyType, TailType>(
     array: &'a [RedisValueRef],
 ) -> Result<(KeyType, RVec<TailType>), OpsError>
 where
@@ -273,29 +273,8 @@ where
     Ok((set_key, tail))
 }
 
-/// Transform &[RedisValueRef] into (KeyType, Vec<TailType>)
-/// Used for commands like DEL arg1 arg2...
-fn get_key_and_tail<'a, KeyType, TailType>(
-    array: &'a [RedisValueRef],
-) -> Result<(KeyType, Vec<TailType>), OpsError>
-where
-    KeyType: TryFrom<&'a RedisValueRef, Error = OpsError>,
-    TailType: TryFrom<&'a RedisValueRef, Error = OpsError>,
-{
-    if array.len() < 3 {
-        return Err(OpsError::WrongNumberOfArgs(3, array.len()));
-    }
-    let set_key = KeyType::try_from(&array[1])?;
-    let mut tail: Vec<TailType> = Vec::new();
-    for tail_item in array.iter().skip(2) {
-        let tmp = TailType::try_from(tail_item)?;
-        tail.push(tmp)
-    }
-    Ok((set_key, tail))
-}
-
 /// Transform a sequence of [Key1, Val1, Key2, Val2, ...] -> Vec<(Key, Value)>
-fn smallvec_get_key_value_pairs<'a, KeyType, ValueType>(
+fn get_key_value_pairs<'a, KeyType, ValueType>(
     tail: &[&'a RedisValueRef],
 ) -> Result<RVec<(KeyType, ValueType)>, OpsError>
 where
@@ -306,26 +285,6 @@ where
     let keys = tail.iter().step_by(2);
     let vals = tail.iter().skip(1).step_by(2);
     let mut ret = RVec::new();
-    for (&key, &val) in keys.zip(vals) {
-        let key = KeyType::try_from(key)?;
-        let val = ValueType::try_from(val)?;
-        ret.push((key, val))
-    }
-    Ok(ret)
-}
-
-/// Transform a sequence of [Key1, Val1, Key2, Val2, ...] -> Vec<(Key, Value)>
-fn get_key_value_pairs<'a, KeyType, ValueType>(
-    tail: &[&'a RedisValueRef],
-) -> Result<Vec<(KeyType, ValueType)>, OpsError>
-where
-    KeyType: TryFrom<&'a RedisValueRef, Error = OpsError> + Debug,
-    ValueType: TryFrom<&'a RedisValueRef, Error = OpsError> + Debug,
-{
-    ensure_even(tail)?;
-    let keys = tail.iter().step_by(2);
-    let vals = tail.iter().skip(1).step_by(2);
-    let mut ret = Vec::new();
     for (&key, &val) in keys.zip(vals) {
         let key = KeyType::try_from(key)?;
         let val = ValueType::try_from(val)?;
@@ -383,7 +342,7 @@ fn translate_array(array: &[RedisValueRef]) -> Result<Ops, OpsError> {
             let (key, val) = get_key_and_value(array)?;
             ok!(KeyOps::Set(key, val))
         }
-        "mset" => ok!(KeyOps::MSet(smallvec_get_key_value_pairs(&tail)?)),
+        "mset" => ok!(KeyOps::MSet(get_key_value_pairs(&tail)?)),
         "get" => {
             verify_size(&tail, 1)?;
             let key = Key::try_from(tail[0])?;
@@ -443,17 +402,17 @@ fn translate_array(array: &[RedisValueRef]) -> Result<Ops, OpsError> {
         }
         "sdiff" => {
             verify_size_lower(&tail, 2)?;
-            let keys = values_from_tail(&tail)?;
+            let keys = smallvec_values_from_tail(&tail)?;
             ok!(SetOps::SDiff(keys))
         }
         "sunion" => {
             verify_size_lower(&tail, 2)?;
-            let keys = values_from_tail(&tail)?;
+            let keys = smallvec_values_from_tail(&tail)?;
             ok!(SetOps::SUnion(keys))
         }
         "sinter" => {
             verify_size_lower(&tail, 2)?;
-            let keys = values_from_tail(&tail)?;
+            let keys = smallvec_values_from_tail(&tail)?;
             ok!(SetOps::SInter(keys))
         }
         "sdiffstore" => {
@@ -498,7 +457,7 @@ fn translate_array(array: &[RedisValueRef]) -> Result<Ops, OpsError> {
             ok!(SetOps::SRandMembers(key, count))
         }
         "lpush" => {
-            let (key, vals) = smallvec_get_key_and_tail(array)?;
+            let (key, vals) = get_key_and_tail(array)?;
             ok!(ListOps::LPush(key, vals))
         }
         "rpush" => {
@@ -629,7 +588,7 @@ fn translate_array(array: &[RedisValueRef]) -> Result<Ops, OpsError> {
         "hmget" => {
             verify_size_lower(&tail, 2)?;
             let key = Key::try_from(tail[0])?;
-            let fields = values_from_tail(&tail[1..])?;
+            let fields = smallvec_values_from_tail(&tail[1..])?;
             ok!(HashOps::HMGet(key, fields))
         }
         "hkeys" => {

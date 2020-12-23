@@ -1,23 +1,24 @@
 use crate::op_variants;
+use crate::ops::RVec;
 use crate::types::{Count, Key, ReturnValue, StateRef, Value};
 use std::collections::HashSet;
 
 op_variants! {
     SetOps,
-    SAdd(Key, Vec<Value>),
+    SAdd(Key, RVec<Value>),
     SCard(Key),
-    SDiff(Vec<Value>),
-    SDiffStore(Key, Vec<Value>),
-    SInter(Vec<Value>),
-    SInterStore(Key, Vec<Value>),
+    SDiff(RVec<Value>),
+    SDiffStore(Key, RVec<Value>),
+    SInter(RVec<Value>),
+    SInterStore(Key, RVec<Value>),
     SIsMember(Key, Value),
     SMembers(Key),
     SMove(Key, Key, Value),
     SPop(Key, Option<Count>),
     SRandMembers(Key, Option<Count>),
-    SRem(Key, Vec<Value>),
-    SUnion(Vec<Value>),
-    SUnionStore(Key, Vec<Value>)
+    SRem(Key, RVec<Value>),
+    SUnion(RVec<Value>),
+    SUnionStore(Key, RVec<Value>)
 }
 
 pub enum SetAction {
@@ -29,7 +30,7 @@ pub enum SetAction {
 make_reader!(sets, read_sets);
 make_writer!(sets, write_sets);
 
-fn many_set_op(state: &StateRef, keys: Vec<Key>, op: SetAction) -> Option<HashSet<Value>> {
+fn many_set_op(state: &StateRef, keys: RVec<Key>, op: SetAction) -> Option<HashSet<Value>> {
     let sets_that_exist: Vec<_> = keys
         .iter()
         .filter(|&k| state.sets.contains_key(k))
@@ -73,7 +74,7 @@ pub async fn set_interact(set_op: SetOps, state: StateRef) -> ReturnValue {
         }
         SetOps::SMembers(set_key) => read_sets!(state, &set_key)
             .map(|set| set.iter().cloned().collect())
-            .unwrap_or_else(Vec::new)
+            .unwrap_or_else(RVec::new)
             .into(),
         SetOps::SCard(set_key) => read_sets!(state, &set_key)
             .map(|set| set.len() as Count)
@@ -88,15 +89,15 @@ pub async fn set_interact(set_op: SetOps, state: StateRef) -> ReturnValue {
             .into(),
         SetOps::SDiff(keys) => many_set_op(&state, keys, SetAction::Diff)
             .map(|set| set.into_iter().collect())
-            .unwrap_or_else(Vec::new)
+            .unwrap_or_else(RVec::new)
             .into(),
         SetOps::SUnion(keys) => many_set_op(&state, keys, SetAction::Union)
             .map(|set| set.into_iter().collect())
-            .unwrap_or_else(Vec::new)
+            .unwrap_or_else(RVec::new)
             .into(),
         SetOps::SInter(keys) => many_set_op(&state, keys, SetAction::Inter)
             .map(|set| set.into_iter().collect())
-            .unwrap_or_else(Vec::new)
+            .unwrap_or_else(RVec::new)
             .into(),
         SetOps::SDiffStore(to_store, keys) => match many_set_op(&state, keys, SetAction::Diff) {
             Some(hash_set) => {

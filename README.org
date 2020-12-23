@@ -172,10 +172,10 @@ Therefore, if you want to do something like implement =hashes=, you will need to
 *** KeyOps
 
 - =Set (Key, Value)=
-- =MSet (Vec<(Key, Value)>)=
+- =MSet (RVec<(Key, Value)>)=
 - =Get (Key)=
-- =MGet (Vec<Key>)=
-- =Del (Vec<Key>)=
+- =MGet (RVec<Key>)=
+- =Del (RVec<Key>)=
 - =Rename (Key, Key)=
 - =RenameNx (Key, Key)=
 - =Test (Key)=
@@ -186,13 +186,13 @@ Therefore, if you want to do something like implement =hashes=, you will need to
 - =LIndex (Key, Index)=
 - =LLen (Key)=
 - =LPop (Key)=
-- =LPush (Key, Vec<Value>)=
+- =LPush (Key, RVec<Value>)=
 - =LPushX (Key, Value)=
 - =LRange (Key, Index, Index)=
 - =LSet (Key, Index, Value)=
 - =LTrim (Key, Index, Index)=
 - =RPop (Key)=
-- =RPush (Key, Vec<Value>)=
+- =RPush (Key, RVec<Value>)=
 - =RPushX (Key, Value)=
 - =RPopLPush (Key, Key)=
 - =BLPop (Key, UTimeout)=
@@ -205,12 +205,12 @@ Therefore, if you want to do something like implement =hashes=, you will need to
 - =HSet (Key, Key, Value)=
 - =HExists (Key, Key)=
 - =HGetAll (Key)=
-- =HMGet (Key, Vec<Key>)=
+- =HMGet (Key, RVec<Key>)=
 - =HKeys (Key)=
-- =HMSet (Key, Vec<(Key, Value)>)=
+- =HMSet (Key, RVec<(Key, Value)>)=
 - =HIncrBy (Key, Key, Count)=
 - =HLen (Key)=
-- =HDel (Key, Vec<Key>)=
+- =HDel (Key, RVec<Key>)=
 - =HVals (Key)=
 - =HStrLen (Key, Key)=
 - =HSetNX (Key, Key, Value)=
@@ -218,26 +218,26 @@ Therefore, if you want to do something like implement =hashes=, you will need to
 
 *** SetOps
 
-- =SAdd (Key, Vec<Value>)=
+- =SAdd (Key, RVec<Value>)=
 - =SCard (Key)=
-- =SDiff (Vec<Value>)=
-- =SDiffStore (Key, Vec<Value>)=
-- =SInter (Vec<Value>)=
-- =SInterStore (Key, Vec<Value>)=
+- =SDiff (RVec<Value>)=
+- =SDiffStore (Key, RVec<Value>)=
+- =SInter (RVec<Value>)=
+- =SInterStore (Key, RVec<Value>)=
 - =SIsMember (Key, Value)=
 - =SMembers (Key)=
 - =SMove (Key, Key, Value)=
 - =SPop (Key, Option<Count>)=
 - =SRandMembers (Key, Option<Count>)=
-- =SRem (Key, Vec<Value>)=
-- =SUnion (Vec<Value>)=
-- =SUnionStore (Key, Vec<Value>)=
+- =SRem (Key, RVec<Value>)=
+- =SUnion (RVec<Value>)=
+- =SUnionStore (Key, RVec<Value>)=
 
 
 *** ZSetOps
 
-- =ZAdd (Key, Vec<(Score, Key)>)=
-- =ZRem (Key, Vec<Key>)=
+- =ZAdd (Key, RVec<(Score, Key)>)=
+- =ZRem (Key, RVec<Key>)=
 - =ZRange (Key, Score, Score)=
 - =ZCard (Key)=
 - =ZScore (Key, Key)=
@@ -258,5 +258,6 @@ Therefore, if you want to do something like implement =hashes=, you will need to
 - =STPop (Key)=
 - =STPeek (Key)=
 - =STSize (Key)=
+
 
 

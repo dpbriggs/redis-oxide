@@ -1,3 +1,4 @@
+use crate::ops::RVec;
 use crate::types::{Count, Index, Key, Score};
 use std::cmp::Ordering;
 use std::collections::hash_map::Entry;
@@ -94,7 +95,7 @@ impl SortedSet {
     }
 
     /// Add the following keys and scores to the sorted set
-    pub fn add(&mut self, key_scores: Vec<(Score, Key)>) -> Count {
+    pub fn add(&mut self, key_scores: RVec<(Score, Key)>) -> Count {
         key_scores
             .into_iter()
             .map(|(score, key)| match self.members_hash.entry(key) {
@@ -137,7 +138,7 @@ impl SortedSet {
     }
 
     /// Get all members between (lower, upper) scores
-    pub fn range(&self, range: (Score, Score)) -> Vec<SortedSetMember> {
+    pub fn range(&self, range: (Score, Score)) -> RVec<SortedSetMember> {
         // TODO: Use a more efficient method. I should use a skiplist or an AVL tree.
         // Another option is to retackle the rangebounds stuff, but the semantics are different.
         // I want to be able to compare by score AND member when inserting/removing,
@@ -186,11 +187,13 @@ impl SortedSet {
 #[cfg(test)]
 mod test_sorted_sets_ds {
     use crate::data_structures::sorted_set::{SortedSet, SortedSetMember};
+    use crate::ops::RVec;
     use crate::types::{Key, Score};
     use bytes::Bytes;
+    use smallvec::smallvec;
 
-    fn get_multiple_entries() -> Vec<(Score, Key)> {
-        vec![
+    fn get_multiple_entries() -> RVec<(Score, Key)> {
+        smallvec![
             (1, Bytes::from_static(b"hi_0")),
             (3, Bytes::from_static(b"hi_1")),
             (5, Bytes::from_static(b"hi_2")),
@@ -198,7 +201,7 @@ mod test_sorted_sets_ds {
     }
 
     #[allow(unused)]
-    fn get_multiple_sorted_set_entries() -> Vec<SortedSetMember> {
+    fn get_multiple_sorted_set_entries() -> RVec<SortedSetMember> {
         get_multiple_entries()
             .into_iter()
             .map(|(score, key)| SortedSetMember::new(&key, score))
@@ -208,7 +211,7 @@ mod test_sorted_sets_ds {
     #[test]
     fn test_add() {
         let mut ss = SortedSet::new();
-        assert_eq!(1, ss.add(vec![(2, Bytes::from_static(b"hi"))]));
+        assert_eq!(1, ss.add(smallvec![(2, Bytes::from_static(b"hi"))]));
         assert_eq!(
             get_multiple_entries().len() as i64,
             ss.add(get_multiple_entries())
@@ -220,24 +223,20 @@ mod test_sorted_sets_ds {
     fn test_range() {
         let mut ss = SortedSet::new();
 
-        ss.add(vec![
+        ss.add(smallvec![
             (1, Bytes::from_static(b"hi_0")),
             (3, Bytes::from_static(b"hi_1")),
             (5, Bytes::from_static(b"hi_2")),
         ]);
-        assert_eq!(
-            ss.range((1, 5)),
-            vec![
-                SortedSetMember::new(&Bytes::from_static(b"hi_0"), 1),
-                SortedSetMember::new(&Bytes::from_static(b"hi_1"), 3),
-                SortedSetMember::new(&Bytes::from_static(b"hi_2"), 5),
-            ]
-        );
-        assert_eq!(
-            ss.range((2, 4)),
-            vec![SortedSetMember::new(&b"hi_1".to_vec(), 3),]
-        );
-        let empty_vec: Vec<SortedSetMember> = Vec::new();
+        let expected: RVec<SortedSetMember> = smallvec![
+            SortedSetMember::new(&Bytes::from_static(b"hi_0"), 1),
+            SortedSetMember::new(&Bytes::from_static(b"hi_1"), 3),
+            SortedSetMember::new(&Bytes::from_static(b"hi_2"), 5),
+        ];
+        assert_eq!(ss.range((1, 5)), expected);
+        let expected: RVec<SortedSetMember> = smallvec![SortedSetMember::new(&b"hi_1".to_vec(), 3)];
+        assert_eq!(ss.range((2, 4)), expected);
+        let empty_vec: RVec<SortedSetMember> = RVec::new();
         assert_eq!(ss.range((20, 40)), empty_vec);
     }
 

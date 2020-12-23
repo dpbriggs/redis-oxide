@@ -100,6 +100,8 @@ pub const NULL_BULK_STRING: &str = "$-1\r\n";
 pub const NULL_ARRAY: &str = "*-1\r\n";
 pub const EMPTY_ARRAY: &str = "*0\r\n";
 
+use crate::ops::RVec;
+
 /// Convenience type for returns value. Maps directly to RedisValues.
 #[derive(Debug, PartialEq, Clone)]
 pub enum ReturnValue {
@@ -120,8 +122,8 @@ impl From<Count> for ReturnValue {
 }
 
 /// Convenience trait to convert ReturnValues to ReturnValue.
-impl From<Vec<Value>> for ReturnValue {
-    fn from(vals: Vec<Value>) -> ReturnValue {
+impl From<RVec<Value>> for ReturnValue {
+    fn from(vals: RVec<Value>) -> ReturnValue {
         ReturnValue::Array(vals.into_iter().map(ReturnValue::StringRes).collect())
     }
 }

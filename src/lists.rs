@@ -14,7 +14,7 @@ op_variants! {
     LSet(Key, Index, Value),
     LTrim(Key, Index, Index),
     RPop(Key),
-    RPush(Key, Vec<Value>),
+    RPush(Key, RVec<Value>),
     RPushX(Key, Value),
     RPopLPush(Key, Key),
     BLPop(Key, UTimeout),

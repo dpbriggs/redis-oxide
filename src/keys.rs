@@ -88,8 +88,10 @@ pub async fn key_interact(key_op: KeyOps, state: StateRef) -> ReturnValue {
 #[cfg(test)]
 mod test_keys {
     use crate::keys::{key_interact, KeyOps};
+    use crate::ops::RVec;
     use crate::types::{ReturnValue, State};
     use bytes::Bytes;
+    use smallvec::smallvec;
     use std::sync::Arc;
 
     #[tokio::test]
@@ -126,11 +128,11 @@ mod test_keys {
 
         assert_eq!(
             ReturnValue::IntRes(1),
-            key_interact(KeyOps::Del(vec![l.clone()]), eng.clone()).await
+            key_interact(KeyOps::Del(smallvec![l.clone()]), eng.clone()).await
         );
         assert_eq!(
             ReturnValue::IntRes(0),
-            key_interact(KeyOps::Del(vec![unused]), eng.clone()).await
+            key_interact(KeyOps::Del(smallvec![unused]), eng.clone()).await
         );
     }
 

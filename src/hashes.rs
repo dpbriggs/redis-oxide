@@ -1,7 +1,7 @@
 use crate::op_variants;
+use crate::ops::RVec;
 use crate::types::{Count, Key, ReturnValue, StateRef, Value};
 use crate::{make_reader, make_writer};
-use smallvec::SmallVec;
 use std::collections::hash_map::Entry;
 
 op_variants! {
@@ -10,12 +10,12 @@ op_variants! {
     HSet(Key, Key, Value),
     HExists(Key, Key),
     HGetAll(Key),
-    HMGet(Key, Vec<Key>),
+    HMGet(Key, RVec<Key>),
     HKeys(Key),
-    HMSet(Key, Vec<(Key, Value)>),
+    HMSet(Key, RVec<(Key, Value)>),
     HIncrBy(Key, Key, Count),
     HLen(Key),
-    HDel(Key, SmallVec<[Key; 4]>),
+    HDel(Key, RVec<Key>),
     HVals(Key),
     HStrLen(Key, Key),
     HSetNX(Key, Key, Value)

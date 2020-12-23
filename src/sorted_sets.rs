@@ -1,10 +1,11 @@
+use crate::ops::RVec;
 use crate::types::{Count, Index, Key, ReturnValue, Score, StateRef};
 use crate::{make_reader, make_writer, op_variants};
 
 op_variants! {
     ZSetOps,
-    ZAdd(Key, Vec<(Score, Key)>),
-    ZRem(Key, Vec<Key>),
+    ZAdd(Key, RVec<(Score, Key)>),
+    ZRem(Key, RVec<Key>),
     ZRange(Key, Score, Score),
     ZCard(Key),
     ZScore(Key, Key),
