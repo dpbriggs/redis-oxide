@@ -1,3 +1,6 @@
+use std::sync::Arc;
+
+use crate::scripting::ScriptingBridge;
 use crate::types::{Count, Index, Key, ReturnValue, StateRef, StateStoreRef, Value};
 
 #[derive(Debug, Clone)]
@@ -11,6 +14,7 @@ pub enum MiscOps {
     Echo(Value),
     PrintCmds,
     Select(Index),
+    Script(Value),
     Info,
 }
 
@@ -65,6 +69,7 @@ pub async fn misc_interact(
     misc_op: MiscOps,
     state: &mut StateRef,
     state_store: StateStoreRef,
+    scripting_bridge: Arc<ScriptingBridge>,
 ) -> ReturnValue {
     match misc_op {
         MiscOps::Pong => ReturnValue::StringRes(Value::from_static(b"PONG")),
@@ -114,6 +119,11 @@ pub async fn misc_interact(
             ]
             .join("\r\n");
             ReturnValue::StringRes(info.into())
+        }
+        MiscOps::Script(program) => {
+            let prog_str = String::from_utf8_lossy(&program).to_string();
+            let res = scripting_bridge.handle_script_cmd(prog_str).await;
+            ReturnValue::Ident(res)
         }
     }
 }

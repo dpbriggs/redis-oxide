@@ -13,12 +13,12 @@ name = "redis-oxide"
 path = "src/main.rs"
 
 [dependencies]
-tokio = { version = "0.2.21", features = ["full"] }
-tokio-util = { version = "0.3.1", features = ["codec"] }
+tokio = { version = "1.0.0", features = ["full"] }
+tokio-util = { version = "0.6.0", features = ["codec"] }
 shlex = "0.1.1"
 promptly = "0.1.5"
 rand = "0.7.2"
-bytes = { version = "0.5", features = ["serde"] }
+bytes = { version = "1.0.0", features = ["serde"] }
 sloggers = "0.3.4"
 lazy_static = "1.4.0"
 slog = "2.5.2"
@@ -38,6 +38,8 @@ serde_bytes = "0.11.3"
 dashmap = { version = "3.11.10", features = ["serde"] }
 memchr = "2.3.0"
 smallvec = "1.4.1"
+x7 = { git = "https://github.com/dpbriggs/x7.git", version = "0.2.0" }
+num-traits = "0.2.14"
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"

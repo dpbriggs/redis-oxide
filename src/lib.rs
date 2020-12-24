@@ -27,6 +27,7 @@ pub mod macros;
 pub mod data_structures;
 pub mod misc;
 pub mod ops;
+pub mod scripting;
 pub mod server;
 pub mod sets;
 pub mod sorted_sets;

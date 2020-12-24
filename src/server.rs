@@ -1,9 +1,9 @@
-/// Server launch file. Starts the services to make redis-oxide work.
-use crate::asyncresp::RespParser;
 use crate::database::save_state;
-use crate::logger::LOGGER;
 use crate::misc::misc_interact;
 use crate::ops::{op_interact, Ops};
+/// Server launch file. Starts the services to make redis-oxide work.
+use crate::{asyncresp::RespParser, scripting::ScriptingBridge};
+use crate::{logger::LOGGER, types::StateRef};
 use crate::{
     ops::translate,
     startup::Config,
@@ -11,8 +11,8 @@ use crate::{
 };
 use futures::StreamExt;
 use futures_util::sink::SinkExt;
-use std::net::SocketAddr;
 use std::sync::atomic::Ordering;
+use std::{net::SocketAddr, sync::Arc};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_util::codec::Decoder;
 
@@ -33,12 +33,45 @@ fn incr_and_save_if_required(state: StateStoreRef, dump_file: DumpFile) {
     }
 }
 
+pub async fn process_command(
+    state: &mut StateRef,
+    state_store: StateStoreRef,
+    dump_file: DumpFile,
+    scripting_bridge: Arc<ScriptingBridge>,
+    redis_value: RedisValueRef,
+) -> RedisValueRef {
+    match translate(redis_value) {
+        Ok(op) => {
+            debug!(LOGGER, "running op {:?}", op.clone());
+            // Step 1: Execute the operation the operation (from translate above)
+            let res: ReturnValue = match op {
+                Ops::Misc(op) => {
+                    misc_interact(op, state, state_store.clone(), scripting_bridge.clone()).await
+                }
+                _ => op_interact(op, state.clone()).await,
+            };
+            // Step 2: Update commands_ran_since_save counter, and save if necessary
+            if !state_store.memory_only {
+                incr_and_save_if_required(state_store.clone(), dump_file.clone());
+            }
+            // Step 3: Finally Return
+            res.into()
+        }
+        Err(e) => RedisValueRef::from(e),
+    }
+}
+
 /// Spawn a RESP handler for the given socket.
 ///
 /// This will synchronously process requests / responses for this
 /// connection only. Other connections will be spread across the
 /// thread pool.
-async fn process(socket: TcpStream, state_store: StateStoreRef, dump_file: DumpFile) {
+async fn process(
+    socket: TcpStream,
+    state_store: StateStoreRef,
+    dump_file: DumpFile,
+    scripting_bridge: Arc<ScriptingBridge>,
+) {
     tokio::spawn(async move {
         let mut state = state_store.get_default();
         let mut transport = RespParser::default().framed(socket);
@@ -47,23 +80,39 @@ async fn process(socket: TcpStream, state_store: StateStoreRef, dump_file: DumpF
                 error!(LOGGER, "Error recieving redis value {:?}", e);
                 continue;
             }
-            let res = match translate(redis_value.unwrap()) {
-                Ok(op) => {
-                    debug!(LOGGER, "running op {:?}", op.clone());
-                    // Step 1: Execute the operation the operation (from translate above)
-                    let res: ReturnValue = match op {
-                        Ops::Misc(op) => misc_interact(op, &mut state, state_store.clone()).await,
-                        _ => op_interact(op, state.clone()).await,
-                    };
-                    // Step 2: Update commands_ran_since_save counter, and save if necessary
-                    if !state_store.memory_only {
-                        incr_and_save_if_required(state_store.clone(), dump_file.clone());
-                    }
-                    // Step 3: Finally Return
-                    res.into()
-                }
-                Err(e) => RedisValueRef::from(e),
-            };
+            let res = process_command(
+                &mut state,
+                state_store.clone(),
+                dump_file.clone(),
+                scripting_bridge.clone(),
+                redis_value.unwrap(),
+            )
+            .await;
+            // let res = match translate(redis_value.unwrap()) {
+            //     Ok(op) => {
+            //         debug!(LOGGER, "running op {:?}", op.clone());
+            //         // Step 1: Execute the operation the operation (from translate above)
+            //         let res: ReturnValue = match op {
+            //             Ops::Misc(op) => {
+            //                 misc_interact(
+            //                     op,
+            //                     &mut state,
+            //                     state_store.clone(),
+            //                     scripting_bridge.clone(),
+            //                 )
+            //                 .await
+            //             }
+            //             _ => op_interact(op, state.clone()).await,
+            //         };
+            //         // Step 2: Update commands_ran_since_save counter, and save if necessary
+            //         if !state_store.memory_only {
+            //             incr_and_save_if_required(state_store.clone(), dump_file.clone());
+            //         }
+            //         // Step 3: Finally Return
+            //         res.into()
+            //     }
+            //     Err(e) => RedisValueRef::from(e),
+            // };
             if let Err(e) = transport.send(res).await {
                 error!(LOGGER, "Failed to send data to client! {:?}", e)
             };
@@ -72,7 +121,12 @@ async fn process(socket: TcpStream, state_store: StateStoreRef, dump_file: DumpF
 }
 
 /// The listener for redis-oxide. Accepts connections and spawns handlers.
-pub async fn socket_listener(state_store: StateStoreRef, dump_file: DumpFile, config: Config) {
+pub async fn socket_listener(
+    state_store: StateStoreRef,
+    dump_file: DumpFile,
+    config: Config,
+    scripting_bridge: Arc<ScriptingBridge>,
+) {
     // First, get the address determined and parsed.
     let addr_str = format!("{}:{}", "127.0.0.1", config.port);
     let addr = match addr_str.parse::<SocketAddr>() {
@@ -89,7 +143,7 @@ pub async fn socket_listener(state_store: StateStoreRef, dump_file: DumpFile, co
     };
 
     // Second, bind/listen on that address
-    let mut listener = match TcpListener::bind(&addr).await {
+    let listener = match TcpListener::bind(&addr).await {
         Ok(s) => s,
         Err(e) => {
             error!(
@@ -108,7 +162,13 @@ pub async fn socket_listener(state_store: StateStoreRef, dump_file: DumpFile, co
         match listener.accept().await {
             Ok((socket, _)) => {
                 debug!(LOGGER, "Accepted connection!");
-                process(socket, state_store.clone(), dump_file.clone()).await;
+                process(
+                    socket,
+                    state_store.clone(),
+                    dump_file.clone(),
+                    scripting_bridge.clone(),
+                )
+                .await;
             }
             Err(e) => error!(LOGGER, "Failed to establish connectin: {:?}", e),
         };

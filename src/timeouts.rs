@@ -3,7 +3,6 @@ use crate::data_structures::receipt_map::Receipt;
 use crate::types::{Key, ReturnValue, StateRef, UTimeout};
 use std::future::Future;
 use std::time::Duration;
-// use tokio::timer::Interval;
 use tokio::time;
 
 pub async fn blocking_key_timeout(

@@ -54,6 +54,8 @@ pub enum OpsError {
     InvalidArgs(String),
 }
 
+// impl Error for OpsError {}
+
 impl From<OpsError> for RedisValueRef {
     fn from(op: OpsError) -> RedisValueRef {
         match op {
@@ -126,15 +128,17 @@ impl TryFrom<&RedisValueRef> for Bytes {
     type Error = OpsError;
 
     fn try_from(r: &RedisValueRef) -> Result<Value, Self::Error> {
-        // SAFETY: We can only be here if we're processing an op,
-        // and therefore there's a live reference count at this point.
-        // If there's issues, use this instead: Value::try_from(r.clone())
         match r {
-            RedisValueRef::BulkString(s) => unsafe {
-                let len = s.len();
-                let buf: &'static [u8] = std::slice::from_raw_parts(s.as_ptr(), len);
-                Ok(Value::from_static(buf))
-            },
+            RedisValueRef::BulkString(r) => Ok(Value::from(r.clone())),
+            // SAFETY: I was dead wrong, this corrupts memory.
+            // UNSAFETY: We can only be here if we're processing an op,
+            // and therefore there's a live reference count at this point.
+            // If there's issues, use this instead: Value::try_from(r.clone())
+            // RedisValueRef::BulkString(s) => unsafe {
+            //     let len = s.len();
+            //     let buf: &'static [u8] = std::slice::from_raw_parts(s.as_ptr(), len);
+            //     Ok(Value::from_static(buf))
+            // },
             _ => Err(OpsError::InvalidType),
         }
     }
@@ -337,6 +341,11 @@ fn translate_array(array: &[RedisValueRef]) -> Result<Ops, OpsError> {
         "keys" => ok!(MiscOps::Keys),
         "flushall" => ok!(MiscOps::FlushAll),
         "flushdb" => ok!(MiscOps::FlushDB),
+        "script" => {
+            verify_size(&tail, 1)?;
+            let program = Value::try_from(tail[0])?;
+            ok!(MiscOps::Script(program))
+        }
         // Key-Value
         "set" => {
             let (key, val) = get_key_and_value(array)?;

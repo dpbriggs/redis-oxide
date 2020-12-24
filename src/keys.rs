@@ -88,7 +88,6 @@ pub async fn key_interact(key_op: KeyOps, state: StateRef) -> ReturnValue {
 #[cfg(test)]
 mod test_keys {
     use crate::keys::{key_interact, KeyOps};
-    use crate::ops::RVec;
     use crate::types::{ReturnValue, State};
     use bytes::Bytes;
     use smallvec::smallvec;

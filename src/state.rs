@@ -1,4 +1,3 @@
-// use rand::Rng;
 use crate::data_structures::receipt_map::{KeyTypes, Receipt};
 use crate::types::{Index, ReturnValue, State, StateRef, StateStore};
 use std::fmt;
@@ -15,6 +14,7 @@ impl fmt::Display for ReturnValue {
             ReturnValue::Nil => write!(f, "(nil)"),
             ReturnValue::Error(e) => write!(f, "ERR {:?}", e),
             ReturnValue::Array(a) => write!(f, "{:?}", a),
+            ReturnValue::Ident(r) => write!(f, "{:?}", r),
         }
     }
 }

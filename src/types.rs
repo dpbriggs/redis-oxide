@@ -112,6 +112,7 @@ pub enum ReturnValue {
     Array(Vec<ReturnValue>),
     IntRes(i64),
     Nil,
+    Ident(RedisValueRef),
 }
 
 /// Convenience trait to convert Count to ReturnValue.
@@ -219,6 +220,7 @@ impl From<ReturnValue> for RedisValueRef {
             ReturnValue::Array(a) => {
                 RedisValueRef::Array(a.into_iter().map(RedisValueRef::from).collect())
             }
+            ReturnValue::Ident(r) => r,
         }
     }
 }
