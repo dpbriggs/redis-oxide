@@ -231,7 +231,7 @@ impl ScriptingEngine {
         self.interpreter.add_function("redis", send_fn.to_x7_fn());
     }
 
-    /// Add the "def-redus-fn" function to the interpreter
+    /// Add the "def-redis-fn" function to the interpreter
     ///
     /// e.g. script '(def-redis-fn my-sum (a b) (+ a b))'
     /// >>> my-sum "hello " world
