@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use crate::scripting::ScriptingBridge;
-use crate::types::{Count, Index, Key, ReturnValue, StateRef, StateStoreRef, Value};
+use crate::scripting::{Program, ScriptingBridge};
+use crate::types::{Count, Index, Key, RedisValueRef, ReturnValue, StateRef, StateStoreRef, Value};
 
 #[derive(Debug, Clone)]
 pub enum MiscOps {
@@ -15,6 +15,7 @@ pub enum MiscOps {
     PrintCmds,
     Select(Index),
     Script(Value),
+    EmbeddedScript(Value, Vec<RedisValueRef>),
     Info,
 }
 
@@ -122,7 +123,18 @@ pub async fn misc_interact(
         }
         MiscOps::Script(program) => {
             let prog_str = String::from_utf8_lossy(&program).to_string();
-            let res = scripting_bridge.handle_script_cmd(prog_str).await;
+            let res = scripting_bridge
+                .handle_script_cmd(Program::String(prog_str))
+                .await;
+            ReturnValue::Ident(res)
+        }
+        MiscOps::EmbeddedScript(fn_name, fn_args) => {
+            // We need to send the program over the scripting bridge
+            // and wait for the result
+            let fn_name = String::from_utf8_lossy(&fn_name).to_string();
+            let res = scripting_bridge
+                .handle_script_cmd(Program::Function(fn_name, fn_args))
+                .await;
             ReturnValue::Ident(res)
         }
     }

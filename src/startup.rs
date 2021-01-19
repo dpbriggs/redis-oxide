@@ -22,6 +22,8 @@ pub struct Config {
     /// Run in memory only mode. Don't save database state to disk
     #[structopt(short = "m", long = "memory-only")]
     pub memory_only: bool,
+    #[structopt(short = "f", long = "scripts-dir")]
+    pub scripts_dir: Option<std::path::PathBuf>,
 }
 
 pub fn startup_message(config: &Config) {

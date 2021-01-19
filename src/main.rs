@@ -35,27 +35,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     // 6. Create the channels for scripting
     let (prog_string_sx, prog_string_rx) = channel(12);
-    let (prog_result_sx, prog_result_rx) = channel(12);
-    let (cmd_sx, cmd_rx) = channel(12);
     let (cmd_result_sx, cmd_result_rx) = channel(12);
 
     let scripting_engine =
-        ScriptingEngine::new(prog_string_rx, prog_result_sx, cmd_rx, cmd_result_sx);
+        ScriptingEngine::new(prog_string_rx, cmd_result_sx, state.clone(), &opt)?;
 
     info!(LOGGER, "ScriptingEngine main loop started");
     std::thread::spawn(|| scripting_engine.main_loop());
 
-    let scripting_bridge = ScriptingBridge::new(prog_string_sx, prog_result_rx);
+    let scripting_bridge = ScriptingBridge::new(prog_string_sx);
 
     tokio::spawn(handle_redis_cmd(
         cmd_result_rx,
-        cmd_sx,
         state.clone(),
         dump_file.clone(),
         scripting_bridge.clone(),
     ));
 
-    // 6. Start the server! It will start listening for connections.
+    // 7. Start the server! It will start listening for connections.
     socket_listener(state.clone(), dump_file.clone(), opt, scripting_bridge).await;
     Ok(())
 }

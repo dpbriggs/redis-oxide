@@ -120,10 +120,12 @@ fn bulk_string(buf: &BytesMut, pos: usize) -> RedisResult {
     }
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn simple_string(buf: &BytesMut, pos: usize) -> RedisResult {
     Ok(word(buf, pos).map(|(pos, word)| (pos, RedisBufSplit::String(word))))
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn error(buf: &BytesMut, pos: usize) -> RedisResult {
     Ok(word(buf, pos).map(|(pos, word)| (pos, RedisBufSplit::Error(word))))
 }

@@ -7,7 +7,7 @@ use std::convert::From;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
-use parking_lot::Mutex;
+use parking_lot::{Mutex, RwLock};
 use std::fs::File;
 
 use crate::data_structures::receipt_map::RecieptMap;
@@ -175,6 +175,8 @@ pub struct StateStore {
     pub commands_threshold: u64,
     #[serde(skip)]
     pub memory_only: bool,
+    #[serde(skip)]
+    pub foreign_functions: RwLock<HashSet<String>>,
 }
 
 /// Reference type for `StateStore`

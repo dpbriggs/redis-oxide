@@ -1,6 +1,7 @@
+#![forbid(unsafe_code)]
 #![warn(rust_2018_idioms)]
 #![feature(test, async_closure)]
-#![warn(clippy::all, clippy::nursery)]
+#![warn(clippy::all)]
 #![feature(const_fn)]
 
 #[macro_use]

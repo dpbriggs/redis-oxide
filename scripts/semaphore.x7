@@ -1,0 +1,15 @@
+(def-redis-fn sum-list
+  (li)
+  (apply + (map int (redis "lrange" li 0 -1))))
+
+(defn any?
+  (p l)
+  (reduce (fn (a b) (or a b)) (map p l)))
+
+(def-redis-fn is-prime?
+  (key)
+  (bind
+   (n (int (redis "get" key)))
+   (not
+    (any? (fn (x) (= 0 (% n x)))
+          (range 2 n)))))

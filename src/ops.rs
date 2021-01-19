@@ -10,7 +10,7 @@ use crate::misc::MiscOps;
 use crate::sets::{set_interact, SetOps};
 use crate::sorted_sets::{zset_interact, ZSetOps};
 use crate::stack::{stack_interact, StackOps};
-use crate::types::{ReturnValue, StateRef};
+use crate::types::{ReturnValue, StateRef, StateStoreRef};
 
 use crate::types::{Count, Index, Key, RedisValueRef, Score, UTimeout, Value};
 
@@ -129,16 +129,7 @@ impl TryFrom<&RedisValueRef> for Bytes {
 
     fn try_from(r: &RedisValueRef) -> Result<Value, Self::Error> {
         match r {
-            RedisValueRef::BulkString(r) => Ok(Value::from(r.clone())),
-            // SAFETY: I was dead wrong, this corrupts memory.
-            // UNSAFETY: We can only be here if we're processing an op,
-            // and therefore there's a live reference count at this point.
-            // If there's issues, use this instead: Value::try_from(r.clone())
-            // RedisValueRef::BulkString(s) => unsafe {
-            //     let len = s.len();
-            //     let buf: &'static [u8] = std::slice::from_raw_parts(s.as_ptr(), len);
-            //     Ok(Value::from_static(buf))
-            // },
+            RedisValueRef::BulkString(r) => Ok(r.clone()),
             _ => Err(OpsError::InvalidType),
         }
     }
@@ -190,7 +181,7 @@ fn ensure_even<T>(v: &[T]) -> Result<(), OpsError> {
     Ok(())
 }
 
-const DEFAULT_SMALL_VEC_SIZE: usize = 4;
+const DEFAULT_SMALL_VEC_SIZE: usize = 2;
 pub type RVec<T> = SmallVec<[T; DEFAULT_SMALL_VEC_SIZE]>;
 
 use smallvec::SmallVec;
@@ -329,14 +320,17 @@ macro_rules! ok {
     };
 }
 
-fn translate_array(array: &[RedisValueRef]) -> Result<Ops, OpsError> {
+fn translate_array(array: &[RedisValueRef], state_store: StateStoreRef) -> Result<Ops, OpsError> {
     if array.is_empty() {
         return Err(OpsError::Noop);
     }
     let head = Value::try_from(&array[0])?;
+    let head_s = String::from_utf8_lossy(&head);
+    if state_store.contains_foreign_function(&head_s) {
+        return ok!(MiscOps::EmbeddedScript(head, array[1..].to_vec()));
+    }
     let tail: Vec<&RedisValueRef> = array.iter().skip(1).collect();
-    let head = &String::from_utf8_lossy(&head);
-    match head.to_lowercase().as_ref() {
+    match head_s.to_lowercase().as_ref() {
         "ping" => ok!(MiscOps::Pong),
         "keys" => ok!(MiscOps::Keys),
         "flushall" => ok!(MiscOps::FlushAll),
@@ -738,10 +732,10 @@ fn translate_array(array: &[RedisValueRef]) -> Result<Ops, OpsError> {
     }
 }
 
-pub fn translate(rv: RedisValueRef) -> Result<Ops, OpsError> {
+pub fn translate(rv: RedisValueRef, state_store: StateStoreRef) -> Result<Ops, OpsError> {
     match rv {
-        RedisValueRef::Array(vals) => translate_array(&vals),
-        bs @ RedisValueRef::BulkString(_) => translate_array(&[bs]),
+        RedisValueRef::Array(vals) => translate_array(&vals, state_store),
+        bs @ RedisValueRef::BulkString(_) => translate_array(&[bs], state_store),
         _ => Err(OpsError::UnknownOp),
     }
 }

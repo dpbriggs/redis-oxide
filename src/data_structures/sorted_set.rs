@@ -6,7 +6,7 @@ use std::collections::{BTreeSet, HashMap};
 
 // TODO: Use convenient-skiplist
 
-// TODO: Why doesn't this actually allow it? 🤔
+// TODO: Why doesn't this actually allow it?
 #[allow(clippy::mutable_key_type)]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct SortedSetMember {
@@ -82,6 +82,7 @@ impl SortedSetMember {
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
+#[allow(clippy::mutable_key_type)]
 pub struct SortedSet {
     members_hash: HashMap<Key, Score>,
     scores: BTreeSet<SortedSetMember>,

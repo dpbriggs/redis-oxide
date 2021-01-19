@@ -40,7 +40,7 @@ pub async fn process_command(
     scripting_bridge: Arc<ScriptingBridge>,
     redis_value: RedisValueRef,
 ) -> RedisValueRef {
-    match translate(redis_value) {
+    match translate(redis_value, state_store.clone()) {
         Ok(op) => {
             debug!(LOGGER, "running op {:?}", op.clone());
             // Step 1: Execute the operation the operation (from translate above)

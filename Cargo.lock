@@ -675,12 +675,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "glob"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b919933a397b79c37e33b77bb2aa3dc8eb6e165ad809e58ff75bc7db2e34574"
-
-[[package]]
 name = "growable-bloom-filter"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2231,15 +2225,15 @@ checksum = "85e60b0d1b5f99db2556934e21937020776a5d31520bf169e851ac44e6420214"
 [[package]]
 name = "x7"
 version = "0.2.0"
-source = "git+https://github.com/dpbriggs/x7.git#274d03b0521cff37a52c72fe74fd95f16c674c9f"
+source = "git+https://github.com/dpbriggs/x7.git#a18ccd76023a7b5a5dfc8c1d133e3dea95b99866"
 dependencies = [
  "anyhow",
  "bigdecimal",
  "dashmap",
- "glob",
  "im",
  "itertools",
  "nom",
+ "num-traits",
  "once_cell",
  "parking_lot 0.11.1",
  "rand 0.7.3",
@@ -2248,4 +2242,5 @@ dependencies = [
  "rustyline-derive",
  "structopt",
  "thiserror",
+ "walkdir",
 ]
