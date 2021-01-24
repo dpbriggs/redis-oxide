@@ -1,0 +1,6 @@
+(def-redis-fn eulerp1
+  (n)
+  (reduce +
+          (filter
+           (fn (x) (or (= 0 (% x 3)) (= 0 (% x 5))))
+           (range (int n)))))

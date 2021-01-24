@@ -13,3 +13,7 @@
    (not
     (any? (fn (x) (= 0 (% n x)))
           (range 2 n)))))
+
+(def-redis-fn sum-args
+  (& args)
+  (apply + (map int args)))
