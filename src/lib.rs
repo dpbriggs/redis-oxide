@@ -2,7 +2,6 @@
 #![warn(rust_2018_idioms)]
 #![feature(test, async_closure)]
 #![warn(clippy::all)]
-#![feature(const_fn)]
 
 #[macro_use]
 extern crate serde_derive;

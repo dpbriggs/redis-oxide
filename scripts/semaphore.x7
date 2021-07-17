@@ -1,0 +1,41 @@
+(defn repeat
+  "Generate a list of length n by falling f repeatedly."
+  (f n)
+  (map (fn (ignored) (f)) (range n)))
+
+(def semaphore--name-segment-length 8)
+(def semaphore--name-segment-count 5)
+
+(defn semaphore--random-segment
+  "Generate a single segment for the semaphore."
+  ()
+  (apply + (repeat (fn () (str (random_int 0 10))) semaphore--name-segment-length)))
+
+(defn semaphore--random-name
+  "Generate a name for the semaphore. Looks like 01234567-12121212-..."
+  ()
+  (bind
+   (seq (repeat
+         (fn () (semaphore--random-segment))
+         semaphore--name-segment-count))
+   (+ (head seq)
+      (apply + (map (fn (seg) (+ "-" seg)) (tail seq))))))
+
+;; Make it easy to debug this file when not running inside of redis-oxide
+(if (not (ident-exists def-redis-fn))
+    (do
+     (println "In debug mode!")
+     (def def-redis-fn defn))
+    ())
+
+(def-redis-fn sema/new
+    ()
+  (semaphore--random-name))
+
+(def-redis-fn sema/inc
+  (sema-name)
+  (redis "lpush" sema-name "-"))
+
+(def-redis-fn sema/dec
+  (sema-name duration)
+  (redis "blpop" sema-name duration))
