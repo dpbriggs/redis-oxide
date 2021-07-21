@@ -124,7 +124,7 @@ The general design of =redis-oxide= is:
 
 - A Command (=set foo bar=) is read off the socket and passed to the translate function in =src/ops.rs=.
   - The parser generates a =RedisValue=, which is the lingua franca of =redis-oxide=.
-- This gets converted to an =Ops::XYZ(XYZOps::Foobar(..))= enum object, which is consumed by the =op_interact= function. 
+- This gets converted to an =Ops::XYZ(XYZOps::Foobar(..))= enum object, which is consumed by the =op_interact= function.
   - A macro is used to provide automate this.
 - This operation is executed against the global =State= object (using the =op_interact= function)
   - This will return an =ReturnValue= type, which is a more convenient form of =RedisValue=.
@@ -260,4 +260,16 @@ Therefore, if you want to do something like implement =hashes=, you will need to
 - =STSize (Key)=
 
 
+*** MiscOps
 
+- =Keys ()=
+- =Exists (Vec<Key>)=
+- =Pong ()=
+- =FlushAll ()=
+- =FlushDB ()=
+- =Echo (Value)=
+- =PrintCmds ()=
+- =Select (Index)=
+- =Script (Value)=
+- =EmbeddedScript (Value, Vec<RedisValueRef>)=
+- =Info ()=

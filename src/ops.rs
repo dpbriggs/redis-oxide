@@ -331,10 +331,10 @@ fn translate_array(array: &[RedisValueRef], state_store: StateStoreRef) -> Resul
     }
     let tail: Vec<&RedisValueRef> = array.iter().skip(1).collect();
     match head_s.to_lowercase().as_ref() {
-        "ping" => ok!(MiscOps::Pong),
-        "keys" => ok!(MiscOps::Keys),
-        "flushall" => ok!(MiscOps::FlushAll),
-        "flushdb" => ok!(MiscOps::FlushDB),
+        "ping" => ok!(MiscOps::Pong()),
+        "keys" => ok!(MiscOps::Keys()),
+        "flushall" => ok!(MiscOps::FlushAll()),
+        "flushdb" => ok!(MiscOps::FlushDB()),
         "script" => {
             verify_size(&tail, 1)?;
             let program = Value::try_from(tail[0])?;
@@ -355,11 +355,6 @@ fn translate_array(array: &[RedisValueRef], state_store: StateStoreRef) -> Resul
             verify_size_lower(&tail, 1)?;
             let keys = smallvec_values_from_tail(&tail)?;
             ok!(KeyOps::MGet(keys))
-        }
-        "test" => {
-            verify_size(&tail, 1)?;
-            let key = Key::try_from(tail[0])?;
-            ok!(KeyOps::Test(key))
         }
         "del" => {
             verify_size_lower(&tail, 1)?;
@@ -383,7 +378,7 @@ fn translate_array(array: &[RedisValueRef], state_store: StateStoreRef) -> Resul
             let keys = values_from_tail(&tail)?;
             ok!(MiscOps::Exists(keys))
         }
-        "printcmds" => ok!(MiscOps::PrintCmds),
+        "printcmds" => ok!(MiscOps::PrintCmds()),
         // Sets
         "sadd" => {
             let (set_key, vals) = get_key_and_tail(array)?;
@@ -704,7 +699,7 @@ fn translate_array(array: &[RedisValueRef], state_store: StateStoreRef) -> Resul
         }
         "info" => {
             verify_size(&tail, 0)?;
-            ok!(MiscOps::Info)
+            ok!(MiscOps::Info())
         }
         // StackOps
         "stpush" => {

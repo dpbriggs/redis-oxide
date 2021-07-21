@@ -10,8 +10,7 @@ op_variants! {
     MGet(RVec<Key>),
     Del(RVec<Key>),
     Rename(Key, Key),
-    RenameNx(Key, Key),
-    Test(Key)
+    RenameNx(Key, Key)
 }
 
 pub async fn key_interact(key_op: KeyOps, state: StateRef) -> ReturnValue {
@@ -66,21 +65,6 @@ pub async fn key_interact(key_op: KeyOps, state: StateRef) -> ReturnValue {
                 }
                 None => ReturnValue::Error(b"no such key"),
             }
-        }
-        // TODO: Keep this?
-        KeyOps::Test(_key) => {
-            // let value: Value = state
-            //     .kv
-            //     .get(&key)
-            //     .map(|r| r.value().clone())
-            //     .unwrap_or_else(|| b"hi".to_vec());
-            // info!(
-            //     LOGGER,
-            //     "{} = {}",
-            //     String::from_utf8_lossy(&key),
-            //     String::from_utf8_lossy(&value)
-            // );
-            ReturnValue::Ok
         }
     }
 }
