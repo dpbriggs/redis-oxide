@@ -1,3 +1,6 @@
+// Clippy does not like SortedSet. TODO: Figure out if we can fix this.
+#![allow(clippy::mutable_key_type)]
+
 use crate::ops::RVec;
 use crate::types::{Count, Index, Key, Score};
 use std::cmp::Ordering;
@@ -82,7 +85,6 @@ impl SortedSetMember {
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
-#[allow(clippy::mutable_key_type)]
 pub struct SortedSet {
     members_hash: HashMap<Key, Score>,
     scores: BTreeSet<SortedSetMember>,

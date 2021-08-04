@@ -24,6 +24,7 @@ pub mod logger;
 #[macro_use]
 pub mod macros;
 pub mod data_structures;
+pub mod hyperloglog;
 pub mod misc;
 pub mod ops;
 pub mod scripting;

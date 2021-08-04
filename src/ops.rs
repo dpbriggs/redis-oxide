@@ -4,6 +4,7 @@ use std::fmt::Debug;
 
 use crate::bloom::{bloom_interact, BloomOps};
 use crate::hashes::{hash_interact, HashOps};
+use crate::hyperloglog::{hyperloglog_interact, HyperLogLogOps};
 use crate::keys::{key_interact, KeyOps};
 use crate::lists::{list_interact, ListOps};
 use crate::misc::MiscOps;
@@ -24,6 +25,7 @@ pub enum Ops {
     ZSets(ZSetOps),
     Blooms(BloomOps),
     Stacks(StackOps),
+    HyperLogLogs(HyperLogLogOps),
 }
 
 /// Top level interaction function. Used by the server to run
@@ -37,6 +39,7 @@ pub async fn op_interact(op: Ops, state: StateRef) -> ReturnValue {
         Ops::ZSets(op) => zset_interact(op, state).await,
         Ops::Blooms(op) => bloom_interact(op, state).await,
         Ops::Stacks(op) => stack_interact(op, state).await,
+        Ops::HyperLogLogs(op) => hyperloglog_interact(op, state).await,
         _ => unreachable!(),
     }
 }
@@ -181,14 +184,11 @@ fn ensure_even<T>(v: &[T]) -> Result<(), OpsError> {
     Ok(())
 }
 
+use smallvec::SmallVec;
 const DEFAULT_SMALL_VEC_SIZE: usize = 2;
 pub type RVec<T> = SmallVec<[T; DEFAULT_SMALL_VEC_SIZE]>;
 
-use smallvec::SmallVec;
-
-fn smallvec_values_from_tail<'a, ValueType>(
-    tail: &[&'a RedisValueRef],
-) -> Result<SmallVec<[ValueType; DEFAULT_SMALL_VEC_SIZE]>, OpsError>
+fn collect_from_tail<'a, ValueType>(tail: &[&'a RedisValueRef]) -> Result<RVec<ValueType>, OpsError>
 where
     ValueType: TryFrom<&'a RedisValueRef, Error = OpsError>,
 {
@@ -318,6 +318,9 @@ macro_rules! ok {
     (BloomOps::$OpName:ident($($OpArg:expr),*)) => {
         Ok(Ops::Blooms(BloomOps::$OpName($( $OpArg ),*)))
     };
+    (HyperLogLogOps::$OpName:ident($($OpArg:expr),*)) => {
+        Ok(Ops::HyperLogLogs(HyperLogLogOps::$OpName($( $OpArg ),*)))
+    };
 }
 
 fn translate_array(array: &[RedisValueRef], state_store: StateStoreRef) -> Result<Ops, OpsError> {
@@ -353,12 +356,12 @@ fn translate_array(array: &[RedisValueRef], state_store: StateStoreRef) -> Resul
         }
         "mget" => {
             verify_size_lower(&tail, 1)?;
-            let keys = smallvec_values_from_tail(&tail)?;
+            let keys = collect_from_tail(&tail)?;
             ok!(KeyOps::MGet(keys))
         }
         "del" => {
             verify_size_lower(&tail, 1)?;
-            let keys = smallvec_values_from_tail(&tail)?;
+            let keys = collect_from_tail(&tail)?;
             ok!(KeyOps::Del(keys))
         }
         "rename" => {
@@ -400,17 +403,17 @@ fn translate_array(array: &[RedisValueRef], state_store: StateStoreRef) -> Resul
         }
         "sdiff" => {
             verify_size_lower(&tail, 2)?;
-            let keys = smallvec_values_from_tail(&tail)?;
+            let keys = collect_from_tail(&tail)?;
             ok!(SetOps::SDiff(keys))
         }
         "sunion" => {
             verify_size_lower(&tail, 2)?;
-            let keys = smallvec_values_from_tail(&tail)?;
+            let keys = collect_from_tail(&tail)?;
             ok!(SetOps::SUnion(keys))
         }
         "sinter" => {
             verify_size_lower(&tail, 2)?;
-            let keys = smallvec_values_from_tail(&tail)?;
+            let keys = collect_from_tail(&tail)?;
             ok!(SetOps::SInter(keys))
         }
         "sdiffstore" => {
@@ -586,7 +589,7 @@ fn translate_array(array: &[RedisValueRef], state_store: StateStoreRef) -> Resul
         "hmget" => {
             verify_size_lower(&tail, 2)?;
             let key = Key::try_from(tail[0])?;
-            let fields = smallvec_values_from_tail(&tail[1..])?;
+            let fields = collect_from_tail(&tail[1..])?;
             ok!(HashOps::HMGet(key, fields))
         }
         "hkeys" => {
@@ -602,7 +605,7 @@ fn translate_array(array: &[RedisValueRef], state_store: StateStoreRef) -> Resul
         "hdel" => {
             verify_size_lower(&tail, 2)?;
             let key = Key::try_from(tail[0])?;
-            let fields = smallvec_values_from_tail(&tail[1..])?;
+            let fields = collect_from_tail(&tail[1..])?;
             ok!(HashOps::HDel(key, fields))
         }
         "hvals" => {
@@ -664,9 +667,13 @@ fn translate_array(array: &[RedisValueRef], state_store: StateStoreRef) -> Resul
             ok!(ZSetOps::ZPopMax(key, count))
         }
         "zpopmin" => {
-            verify_size(&tail, 2)?;
+            verify_size_lower(&tail, 1)?;
             let key = Key::try_from(tail[0])?;
-            let count = Count::try_from(tail[1])?;
+            let count = if tail.len() == 1 {
+                1.into()
+            } else {
+                Count::try_from(tail[1])?
+            };
             ok!(ZSetOps::ZPopMin(key, count))
         }
         "zrank" => {
@@ -723,7 +730,26 @@ fn translate_array(array: &[RedisValueRef], state_store: StateStoreRef) -> Resul
             let key = Key::try_from(tail[0])?;
             ok!(StackOps::STSize(key))
         }
-        _ => Err(OpsError::UnknownOp),
+        // HyperLogLog
+        "pfadd" => {
+            verify_size_lower(&tail, 1)?;
+            // TODO: Handle zero values case
+            let key = Key::try_from(tail[0])?;
+            let vals = collect_from_tail(&tail[1..])?;
+            ok!(HyperLogLogOps::PfAdd(key, vals))
+        }
+        "pfcount" => {
+            verify_size_lower(&tail, 1)?;
+            ok!(HyperLogLogOps::PfCount(collect_from_tail(&tail)?))
+        }
+        "pfmerge" => {
+            verify_size_lower(&tail, 2)?;
+            let dest = Key::try_from(tail[0])?;
+            let sources = collect_from_tail(&tail[1..])?;
+            ok!(HyperLogLogOps::PfMerge(dest, sources))
+        }
+
+        _ => ok!(MiscOps::Pong()), // _ => Err(OpsError::UnknownOp),
     }
 }
 

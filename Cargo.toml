@@ -41,6 +41,7 @@ smallvec = "1.4.1"
 x7 = { git = "https://github.com/dpbriggs/x7.git", rev = "54f001ee" }
 # x7 = { path = "../x7" }
 num-traits = "0.2.14"
+amadeus-streaming = "0.4.3"
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"

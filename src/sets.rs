@@ -38,6 +38,7 @@ fn many_set_op(state: &StateRef, keys: RVec<Key>, op: SetAction) -> Option<HashS
     if sets_that_exist.is_empty() {
         return None;
     }
+    #[allow(clippy::mutable_key_type)]
     let mut head: HashSet<Key> = state
         .sets
         .get_mut(sets_that_exist[0])
