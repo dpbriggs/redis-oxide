@@ -54,6 +54,7 @@ lazy_static! {
         use crate::sorted_sets::OP_VARIANTS as ZSET_VARIANTS;
         use crate::bloom::OP_VARIANTS as BLOOM_VARIANTS;
         use crate::stack::OP_VARIANTS as STACK_VARIANTS;
+        use crate::hyperloglog::OP_VARIANTS as HYPERLOGLOG_VARIANTS;
         create_commands_list!(
             KEY_VARIANTS,
             LIST_VARIANTS,
@@ -62,6 +63,7 @@ lazy_static! {
             ZSET_VARIANTS,
             BLOOM_VARIANTS,
             STACK_VARIANTS,
+            HYPERLOGLOG_VARIANTS,
             OP_VARIANTS // Misc variants
         )
     };

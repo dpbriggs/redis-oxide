@@ -178,7 +178,6 @@ Therefore, if you want to do something like implement =hashes=, you will need to
 - =Del (RVec<Key>)=
 - =Rename (Key, Key)=
 - =RenameNx (Key, Key)=
-- =Test (Key)=
 
 
 *** ListOps
@@ -258,6 +257,13 @@ Therefore, if you want to do something like implement =hashes=, you will need to
 - =STPop (Key)=
 - =STPeek (Key)=
 - =STSize (Key)=
+
+
+*** HyperLogLogOps
+
+- =PfAdd (Key, RVec<Value>)=
+- =PfCount (RVec<Key>)=
+- =PfMerge (Key, RVec<Key>)=
 
 
 *** MiscOps
