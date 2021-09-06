@@ -2286,7 +2286,7 @@ checksum = "85e60b0d1b5f99db2556934e21937020776a5d31520bf169e851ac44e6420214"
 [[package]]
 name = "x7"
 version = "0.2.0"
-source = "git+https://github.com/dpbriggs/x7.git?rev=54f001ee#54f001eee02889bff762054c1f76e5258334d489"
+source = "git+https://github.com/dpbriggs/x7.git?rev=e3f93c18#e3f93c187f3fc36fa7f909d53a08119ae0273196"
 dependencies = [
  "anyhow",
  "bigdecimal",

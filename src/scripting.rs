@@ -50,7 +50,7 @@ impl ForeignData for RedisValueRef {
             RedisValueRef::ErrorMsg(e) => {
                 return Err(FFIError::boxed(bytes_to_string(e)));
             }
-            RedisValueRef::Int(i) => Expr::Num((*i).into()),
+            RedisValueRef::Int(i) => Expr::Integer(*i),
             RedisValueRef::Array(a) => {
                 Expr::Tuple(a.iter().map(|ele| ele.to_x7()).collect::<Result<_, _>>()?)
             }
@@ -66,7 +66,9 @@ impl ForeignData for RedisValueRef {
                 Expr::Num(n) => RedisValueRef::Int(n.to_i64().ok_or_else(|| {
                     FFIError::boxed(format!("Failed to convert {} into an i64", n))
                 })?),
-                Expr::Symbol(s) | Expr::String(s) => RedisValueRef::BulkString(s.clone().into()),
+                Expr::Integer(n) => RedisValueRef::Int(*n),
+                Expr::String(s) => RedisValueRef::BulkString(s.clone().into()),
+                Expr::Symbol(s) => RedisValueRef::BulkString(s.read().into()),
                 Expr::List(l) | Expr::Tuple(l) | Expr::Quote(l) => RedisValueRef::Array(
                     l.iter()
                         .map(|e| ForeignData::from_x7(e))
@@ -249,7 +251,7 @@ impl ScriptingEngine {
             let f_body = args[2].clone(); // (redis "set" arg1 arg2)
             let res = interpreter_clone.add_dynamic_function(&fn_name, f_args, f_body);
             if res.is_ok() {
-                state_store.add_foreign_function(&fn_name);
+                state_store.add_foreign_function(&fn_name.read());
             }
             res
         };

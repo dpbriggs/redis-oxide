@@ -748,8 +748,7 @@ fn translate_array(array: &[RedisValueRef], state_store: StateStoreRef) -> Resul
             let sources = collect_from_tail(&tail[1..])?;
             ok!(HyperLogLogOps::PfMerge(dest, sources))
         }
-
-        _ => ok!(MiscOps::Pong()), // _ => Err(OpsError::UnknownOp),
+        _ => Err(OpsError::UnknownOp),
     }
 }
 
