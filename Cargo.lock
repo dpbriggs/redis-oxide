@@ -91,8 +91,8 @@ checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 
 [[package]]
 name = "bigdecimal"
-version = "0.2.0"
-source = "git+https://github.com/dpbriggs/bigdecimal-rs?rev=02ba26b#02ba26b67a6a6bdfd9c941a11f19c0445c69b336"
+version = "0.3.0"
+source = "git+https://github.com/dpbriggs/bigdecimal-rs?rev=6528f36b15bcc69ec7d8b8a476db94b5ccd2815a#6528f36b15bcc69ec7d8b8a476db94b5ccd2815a"
 dependencies = [
  "num-bigint",
  "num-integer",
@@ -899,9 +899,9 @@ dependencies = [
 
 [[package]]
 name = "num-bigint"
-version = "0.3.2"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d0a3d5e207573f948a9e5376662aa743a2ea13f7c50a554d7af443a73fbfeba"
+checksum = "74e768dff5fb39a41b3bcd30bb25cf989706c90d028d1ad71971987aa309d535"
 dependencies = [
  "autocfg 1.0.1",
  "num-integer",
@@ -2286,7 +2286,7 @@ checksum = "85e60b0d1b5f99db2556934e21937020776a5d31520bf169e851ac44e6420214"
 [[package]]
 name = "x7"
 version = "0.2.0"
-source = "git+https://github.com/dpbriggs/x7.git?rev=e3f93c18#e3f93c187f3fc36fa7f909d53a08119ae0273196"
+source = "git+https://github.com/dpbriggs/x7.git?rev=f1a410d0#f1a410d0be2f8254ba38fde93bb1c4415692011f"
 dependencies = [
  "anyhow",
  "bigdecimal",
