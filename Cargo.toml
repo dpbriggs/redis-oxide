@@ -13,8 +13,8 @@ name = "redis-oxide"
 path = "src/main.rs"
 
 [dependencies]
-tokio = { version = "1.0.0", features = ["full"] }
-tokio-util = { version = "0.6.0", features = ["codec"] }
+tokio = { version = "1.15", features = ["full", "tracing"] }
+tokio-util = { version = "0.6.9", features = ["codec"] }
 shlex = "0.1.1"
 promptly = "0.1.5"
 rand = "0.7.2"
@@ -42,6 +42,7 @@ x7 = { git = "https://github.com/dpbriggs/x7.git", rev = "f1a410d0" }
 # x7 = { path = "../x7" }
 num-traits = "0.2.14"
 amadeus-streaming = "0.4.3"
+console-subscriber = "0.1.0"
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"
