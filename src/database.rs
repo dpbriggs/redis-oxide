@@ -71,7 +71,7 @@ fn make_data_dir(data_dir: &Path) {
             let err_msg = format!(
                 "Error! Cannot create path {}, error {}",
                 data_dir.to_string_lossy(),
-                e.to_string()
+                e,
             );
             fatal_panic!(err_msg);
         }
@@ -107,7 +107,7 @@ pub fn get_dump_file(config: &Config) -> DumpFile {
         .open(dump_file)
     {
         Ok(f) => f,
-        Err(e) => fatal_panic!(format!("Failed to open dump file! {}", e.to_string())),
+        Err(e) => fatal_panic!(format!("Failed to open dump file! {}", e)),
     };
     // TODO: Use tokio locks here
     Arc::new(Mutex::new(opened_file))

@@ -11,7 +11,7 @@ op_variants! {
 
 make_reader!(hyperloglogs, read_hyperloglogs);
 
-// Error ration from http://antirez.com/news/75
+// Error ratio from http://antirez.com/news/75
 const HYPERLOGLOG_ERROR_RATIO: f64 = 0.0081;
 
 fn default_hyperloglog() -> amadeus_streaming::HyperLogLog<Value> {
@@ -40,8 +40,7 @@ pub async fn hyperloglog_interact(hyperloglog_op: HyperLogLogOps, state: StateRe
             }
             let res = keys
                 .iter()
-                .map(|key| read_hyperloglogs!(&state, key))
-                .flatten()
+                .filter_map(|key| read_hyperloglogs!(state, key))
                 .fold(default_hyperloglog(), |mut acc, curr_pf| {
                     acc.union(&curr_pf);
                     acc
@@ -56,8 +55,7 @@ pub async fn hyperloglog_interact(hyperloglog_op: HyperLogLogOps, state: StateRe
                 .or_insert_with(default_hyperloglog);
             source_keys
                 .iter()
-                .map(|key| read_hyperloglogs!(&state, key))
-                .flatten()
+                .filter_map(|key| read_hyperloglogs!(state, key))
                 .for_each(|ref pf| dest_pf.union(pf));
             ReturnValue::Ok
         }

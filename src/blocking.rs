@@ -1,18 +1,11 @@
 use crate::data_structures::receipt_map::{KeyTypes, Receipt};
 use crate::types::{Key, ReturnValue, StateRef};
 
-use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
-use std::task::Waker;
 use std::task::{Context, Poll};
 
 pub type YieldingFn = Box<dyn Fn() -> Option<ReturnValue> + Send>;
-
-#[derive(Default, Debug)]
-pub struct WakerStore {
-    wakers: HashMap<Key, Vec<Waker>>,
-}
 
 pub struct KeyBlocking {
     f: Box<dyn Fn() -> Option<ReturnValue> + Send>,

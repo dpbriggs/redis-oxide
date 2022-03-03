@@ -71,7 +71,7 @@ impl ForeignData for RedisValueRef {
                 Expr::Symbol(s) => RedisValueRef::BulkString(s.read().into()),
                 Expr::List(l) | Expr::Tuple(l) | Expr::Quote(l) => RedisValueRef::Array(
                     l.iter()
-                        .map(|e| ForeignData::from_x7(e))
+                        .map(ForeignData::from_x7)
                         .collect::<Result<_, _>>()?,
                 ),
                 Expr::Bool(b) => RedisValueRef::BulkString(format!("{}", b).into()),
