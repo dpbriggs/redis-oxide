@@ -41,9 +41,9 @@ pub async fn zset_interact(zset_op: ZSetOps, state: StateRef) -> ReturnValue {
                 zset.range((start, stop))
                     .into_iter()
                     .map(|item| item.member)
-                    .collect()
+                    .collect::<Vec<_>>()
             })
-            .unwrap_or_else(Vec::new)
+            .unwrap_or_default()
             .into(),
         ZSetOps::ZCard(zset_key) => read_zsets!(state, &zset_key)
             .map(|zset| zset.card())
