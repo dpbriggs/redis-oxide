@@ -13,7 +13,7 @@ name = "redis-oxide"
 path = "src/main.rs"
 
 [dependencies]
-tokio = { version = "1.15", features = ["full", "tracing"] }
+tokio = { version = "1.18", features = ["full", "tracing"] }
 tokio-util = { version = "0.6.9", features = ["codec"] }
 shlex = "0.1.1"
 promptly = "0.1.5"
